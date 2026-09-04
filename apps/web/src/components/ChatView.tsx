@@ -6038,6 +6038,7 @@ export default function ChatView(props: ChatViewProps) {
       }
 
       if (command === "terminal.split") {
+        if (!canOperateTerminal) return;
         event.preventDefault();
         event.stopPropagation();
         if (terminalFocusOwner === "right-panel") {
@@ -6052,6 +6053,7 @@ export default function ChatView(props: ChatViewProps) {
       }
 
       if (command === "terminal.splitVertical") {
+        if (!canOperateTerminal) return;
         event.preventDefault();
         event.stopPropagation();
         if (terminalFocusOwner === "right-panel") {
@@ -6066,6 +6068,7 @@ export default function ChatView(props: ChatViewProps) {
       }
 
       if (command === "terminal.close") {
+        if (!canOperateTerminal) return;
         event.preventDefault();
         event.stopPropagation();
         if (terminalFocusOwner === "right-panel" && activeRightPanelSurface?.kind === "terminal") {
@@ -6078,6 +6081,7 @@ export default function ChatView(props: ChatViewProps) {
       }
 
       if (command === "terminal.new") {
+        if (!canOperateTerminal) return;
         event.preventDefault();
         event.stopPropagation();
         if (terminalFocusOwner === "right-panel") {
@@ -6106,7 +6110,7 @@ export default function ChatView(props: ChatViewProps) {
       }
 
       const scriptId = projectScriptIdFromCommand(command);
-      if (!scriptId || !activeProject) return;
+      if (!scriptId || !activeProject || !canOperateTerminal) return;
       const script = activeProject.scripts.find((entry) => entry.id === scriptId);
       if (!script) return;
       event.preventDefault();
@@ -6118,6 +6122,7 @@ export default function ChatView(props: ChatViewProps) {
   }, [
     activeProject,
     activeRightPanelSurface,
+    canOperateTerminal,
     addTerminalSurface,
     activeThreadRef,
     activeThreadPinned,
@@ -7943,7 +7948,7 @@ export default function ChatView(props: ChatViewProps) {
             {...(activeDraftLogicalProjectKey
               ? { onOpenProjectSettings: handleOpenDraftProjectSettings }
               : {})}
-            onRunProjectScript={runProjectScript}
+            onRunProjectScript={canOperateTerminal ? runProjectScript : undefined}
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
