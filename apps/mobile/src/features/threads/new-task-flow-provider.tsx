@@ -653,16 +653,30 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     [activeDraftKey],
   );
 
-  const openDraft = useCallback((draftKey: string): boolean => {
-    const draft = appAtomRegistry.get(composerDraftsAtom)[draftKey];
-    if (!isNewTaskDraftKey(draftKey) || !draft?.project) {
-      return false;
-    }
-    setActiveDraftKey(draftKey);
-    setSelectedEnvironmentId(draft.project.environmentId);
-    setSelectedProjectKey(scopedProjectKey(draft.project.environmentId, draft.project.projectId));
-    return true;
-  }, []);
+  const openDraft = useCallback(
+    (draftKey: string): boolean => {
+      const draft = appAtomRegistry.get(composerDraftsAtom)[draftKey];
+      const stamp = draft?.project;
+      if (!isNewTaskDraftKey(draftKey) || !stamp) {
+        return false;
+      }
+      // The stamped project must be loaded: selectedProject falls back to
+      // the environment's first project otherwise, and the draft would be
+      // sent somewhere the user never chose.
+      const projectLoaded = projects.some(
+        (project) =>
+          project.environmentId === stamp.environmentId && project.id === stamp.projectId,
+      );
+      if (!projectLoaded) {
+        return false;
+      }
+      setActiveDraftKey(draftKey);
+      setSelectedEnvironmentId(stamp.environmentId);
+      setSelectedProjectKey(scopedProjectKey(stamp.environmentId, stamp.projectId));
+      return true;
+    },
+    [projects],
+  );
 
   const selectEnvironment = useCallback(
     (environmentId: EnvironmentId) => {
@@ -689,10 +703,19 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
         (selectedProject !== null
           ? projectsOnTarget.find((project) => project.title === selectedProject.title)
           : undefined);
+      // The draft follows the project it will be sent to, same as setProject;
+      // without a match there is nothing to send to, so it keeps its stamp
+      // until the user picks a project on the new machine.
+      if (match && activeDraftKey !== null && isNewTaskDraftKey(activeDraftKey)) {
+        retargetNewTaskDraft(activeDraftKey, {
+          environmentId: match.environmentId,
+          projectId: match.id,
+        });
+      }
       setSelectedEnvironmentId(environmentId);
       setSelectedProjectKey(match ? scopedProjectKey(match.environmentId, match.id) : null);
     },
-    [projects, selectedProject],
+    [activeDraftKey, projects, selectedProject],
   );
 
   const setWorkspaceMode = useCallback(
