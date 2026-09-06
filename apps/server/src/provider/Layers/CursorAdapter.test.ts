@@ -189,7 +189,8 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
         .pipe(Effect.flip);
       assert.equal(error._tag, "ProviderAdapterRequestError");
       if (error._tag === "ProviderAdapterRequestError") {
-        assert.include(error.detail, "WritableIterable is closed");
+        assert.equal(error.detail, "Cursor reported a transport failure.");
+        assert.equal(error.cause, "Error: RetriableError: WritableIterable is closed");
       }
       yield* adapter.stopSession(threadId);
       const runtimeEvents = yield* Fiber.join(runtimeEventsFiber);

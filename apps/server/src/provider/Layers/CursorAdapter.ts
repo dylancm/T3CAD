@@ -1073,7 +1073,7 @@ export function makeCursorAdapter(
             return yield* new ProviderAdapterRequestError({
               provider: PROVIDER,
               method: "session/prompt",
-              detail: `Cursor reported a transport failure: ${failure}`,
+              detail: "Cursor reported a transport failure.",
               cause: failure,
             });
           }
