@@ -22,14 +22,14 @@ describe("CursorTransportFailure", () => {
     expect(failureFor([...message])).toBe(message);
   });
 
-  it("recognizes a failure after an otherwise normal answer and a stack trace", () => {
-    expect(
-      failureFor(["I inspected the files.\n", diagnostic, "\n    at send (cli.js:1:2)\n\n"]),
-    ).toBe(diagnostic);
+  it("recognizes a standalone failure with a stack trace", () => {
+    expect(failureFor(["\n", diagnostic, "\n    at send (cli.js:1:2)\n\n"])).toBe(diagnostic);
   });
 
   it.each([
     "The error was " + diagnostic,
+    "This is an example of a transport error:\n" + diagnostic,
+    "I inspected the files.\n" + diagnostic,
     "> " + diagnostic,
     "    " + diagnostic,
     "```text\n" + diagnostic + "\n```",
@@ -45,7 +45,7 @@ describe("CursorTransportFailure", () => {
   it("tracks fences across long lines without retaining the answer", () => {
     expect(failureFor(["```\n", "x".repeat(100_000), "\n", diagnostic])).toBeUndefined();
     expect(failureFor(["```", "x".repeat(100_000), "\n", diagnostic])).toBeUndefined();
-    expect(failureFor(["x".repeat(100_000), "\n", diagnostic])).toBe(diagnostic);
+    expect(failureFor(["x".repeat(100_000), "\n", diagnostic])).toBeUndefined();
   });
 
   it("does not retain a previous failure after new output", () => {

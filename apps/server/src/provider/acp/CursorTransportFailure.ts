@@ -4,70 +4,46 @@ const transportError =
 const serverError = "Something went wrong communicating with the server. Please try again.";
 
 interface ReplyState {
-  fence: string | undefined;
+  disqualified: boolean;
   failure: string | undefined;
 }
 
 function consumeLine(state: ReplyState, line: string) {
-  const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-  const marker = fence?.[1];
-  if (state.fence) {
-    if (
-      marker &&
-      marker[0] === state.fence[0] &&
-      marker.length >= state.fence.length &&
-      fence?.[2]?.trim() === ""
-    ) {
-      state.fence = undefined;
-    }
-    state.failure = undefined;
-    return;
-  }
-  if (marker) {
-    state.fence = marker;
-    state.failure = undefined;
-    return;
-  }
+  if (state.disqualified) return;
   const text = line.trimEnd();
   if (transportError.test(text) || text === serverError) {
     state.failure = text;
   } else if (text.trim() !== "" && !(state.failure && /^\s+at\s/.test(text))) {
+    // An explanation or code sample can quote the same diagnostic. Only
+    // classify an assistant item consisting entirely of a transport dump.
+    state.disqualified = true;
     state.failure = undefined;
   }
 }
 
-/** Tracks a terminal Cursor diagnostic without retaining an entire streamed answer. */
+/** Tracks a standalone Cursor diagnostic without retaining an entire streamed answer. */
 export class CursorTransportFailure {
-  private state: ReplyState = { fence: undefined, failure: undefined };
+  private state: ReplyState = { disqualified: false, failure: undefined };
   private line = "";
-  private overflow = false;
 
   push(text: string) {
-    const lines = text.split("\n");
-    for (const [index, part] of lines.entries()) {
-      if (!this.overflow) {
-        if (this.line.length + part.length > maxLineLength) {
-          if (!this.state.fence) {
-            const prefix = this.line + part.slice(0, maxLineLength - this.line.length);
-            this.state.fence = /^ {0,3}(`{3,}|~{3,})/.exec(prefix)?.[1];
-          }
-          this.line = "";
-          this.overflow = true;
-          this.state.failure = undefined;
-        } else {
-          this.line += part;
-        }
-      }
-      if (index < lines.length - 1) {
-        if (!this.overflow) consumeLine(this.state, this.line);
+    for (const [index, part] of text.split("\n").entries()) {
+      if (this.state.disqualified) return;
+      if (index > 0) {
+        consumeLine(this.state, this.line);
         this.line = "";
-        this.overflow = false;
       }
+      if (this.line.length + part.length > maxLineLength) {
+        this.state.disqualified = true;
+        this.state.failure = undefined;
+        this.line = "";
+        return;
+      }
+      this.line += part;
     }
   }
 
   get failure() {
-    if (this.overflow) return undefined;
     const state = { ...this.state };
     consumeLine(state, this.line);
     return state.failure;
