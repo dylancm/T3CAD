@@ -304,6 +304,7 @@ describe("resolveInitialServerAuthGateState", () => {
     { suffix: "#token=replacement-token", cached: false },
     { suffix: "#token=replacement-token", cached: true },
     { suffix: "?token=replacement-token", cached: true },
+    { suffix: "/#token=replacement-token", cached: true },
   ])(
     "re-pairs an authenticated browser with $suffix when cached=$cached",
     async ({ suffix, cached }) => {
