@@ -43,11 +43,14 @@ import { useEnvironmentQuery } from "../../state/query";
 import {
   appendComposerDraftAttachments,
   clearComposerDraft,
-  copyComposerDraftContentIfEmpty,
+  composerDraftsAtom,
+  createNewTaskDraft,
   getComposerDraftSnapshot,
   isComposerDraftEmpty,
+  isNewTaskDraftKey,
   removeComposerDraftAttachment,
   replaceComposerDraftAttachments,
+  retargetNewTaskDraft,
   scheduleUnusedComposerAttachmentCleanup,
   setComposerDraftText,
   setStickyComposerModelSelection,
@@ -168,6 +171,12 @@ type NewTaskFlowContextValue = {
   readonly filteredBranches: ReadonlyArray<VcsRef>;
   readonly reset: () => void;
   readonly setProject: (project: EnvironmentProject) => void;
+  /**
+   * Binds the composer to an existing new-task draft (a row in the thread
+   * list). Returns false when the draft is gone, so the caller can fall back
+   * to a fresh one.
+   */
+  readonly openDraft: (draftKey: string) => boolean;
   readonly selectEnvironment: (environmentId: EnvironmentId) => void;
   readonly setSelectedModelKey: (
     key: string | null,
@@ -231,6 +240,9 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       ? selectedEnvironmentIdOverride
       : (projects[0]?.environmentId ?? null);
   const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null);
+  // The new-task draft the composer is bound to. Null until a project is
+  // chosen; each New Task entry mints its own, so a project can hold several.
+  const [activeDraftKey, setActiveDraftKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [branchQuery, setBranchQuery] = useState("");
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
@@ -246,6 +258,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const reset = useCallback(() => {
     setSelectedEnvironmentId(null);
     setSelectedProjectKey(null);
+    setActiveDraftKey(null);
     setSubmitting(false);
     setBranchQuery("");
     setExpandedProvider(null);
@@ -366,11 +379,11 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     selectedProject?.environmentId ?? null,
   );
   // While a queued pending task is being edited its draft lives under a key
-  // scoped to the queued message, so per-project new-task drafts stay intact.
+  // scoped to the queued message, so new-task drafts stay intact.
   const selectedProjectDraftKey = editingPendingTask
     ? pendingTaskDraftKey(editingPendingTask.messageId)
     : selectedProject
-      ? `new-task:${scopedProjectKey(selectedProject.environmentId, selectedProject.id)}`
+      ? activeDraftKey
       : null;
   const selectedProjectDraft = useComposerDraft(selectedProjectDraftKey);
   const prompt = selectedProjectDraft.text;
@@ -625,18 +638,31 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const setProject = useCallback(
     (project: EnvironmentProject) => {
       const nextProjectKey = scopedProjectKey(project.environmentId, project.id);
-      const nextDraftKey = `new-task:${nextProjectKey}`;
-      if (
-        selectedProjectDraftKey?.startsWith("new-task:") &&
-        selectedProjectDraftKey !== nextDraftKey
-      ) {
-        void copyComposerDraftContentIfEmpty(selectedProjectDraftKey, nextDraftKey);
+      const target = { environmentId: project.environmentId, projectId: project.id };
+      // Switching projects mid-compose keeps the same draft and moves it, so
+      // typed text follows the user; a pending-task edit owns its own key and
+      // is untouched here.
+      if (activeDraftKey !== null && isNewTaskDraftKey(activeDraftKey)) {
+        retargetNewTaskDraft(activeDraftKey, target);
+      } else if (!editingPendingTaskRef.current) {
+        setActiveDraftKey(createNewTaskDraft(target));
       }
       setSelectedEnvironmentId(project.environmentId);
       setSelectedProjectKey(nextProjectKey);
     },
-    [selectedProjectDraftKey],
+    [activeDraftKey],
   );
+
+  const openDraft = useCallback((draftKey: string): boolean => {
+    const draft = appAtomRegistry.get(composerDraftsAtom)[draftKey];
+    if (!isNewTaskDraftKey(draftKey) || !draft?.project) {
+      return false;
+    }
+    setActiveDraftKey(draftKey);
+    setSelectedEnvironmentId(draft.project.environmentId);
+    setSelectedProjectKey(scopedProjectKey(draft.project.environmentId, draft.project.projectId));
+    return true;
+  }, []);
 
   const selectEnvironment = useCallback(
     (environmentId: EnvironmentId) => {
@@ -1089,6 +1115,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       filteredBranches,
       reset,
       setProject,
+      openDraft,
       selectEnvironment,
       setSelectedModelKey,
       setWorkspaceMode,
@@ -1152,6 +1179,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       selectedProjectKey,
       selectedWorktreePath,
       setProject,
+      openDraft,
       selectBranch,
       selectEnvironment,
       setInteractionMode,
