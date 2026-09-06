@@ -22,6 +22,7 @@ import {
   type SidebarProjectGroupingMode,
   type T3ProjectFileScript,
   type ThreadEnvMode,
+  sessionGrantsScope,
 } from "@t3tools/contracts";
 import { resolveEnvModeLabel } from "../BranchToolbar.logic";
 import { createModelSelection } from "@t3tools/shared/model";
@@ -329,8 +330,8 @@ function ProjectDetail({ group }: { group: SidebarProjectSnapshot }) {
     const session = Option.getOrNull(AsyncResult.value(result));
     return (
       result._tag !== "Failure" &&
-      session?.authenticated === true &&
-      session.scopes?.includes(AuthOrchestrationOperateScope) === true
+      session !== null &&
+      sessionGrantsScope(session, AuthOrchestrationOperateScope)
     );
   });
   const settings = usePrimarySettings();
