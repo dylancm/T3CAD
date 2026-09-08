@@ -131,7 +131,7 @@ export function KiCadProjectPanel({ mode, threadRef, projectPath }: KiCadProject
             {projectPath?.split(/[\\/]/).filter(Boolean).at(-1) ?? "Current project"}
           </span>
           <span className="rounded border border-border px-1 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-            read-only
+            viewer
           </span>
           <button
             type="button"

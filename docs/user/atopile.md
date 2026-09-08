@@ -33,9 +33,24 @@ local parts service; see the atopile documentation for the version you run.
 Prompts such as "add a pull-up on SDA and build" work without naming the tools;
 agents call `ato_build` after editing `.ato` files and fix the reported errors.
 
-## Showing the board
+## In the KiCad viewer
 
-`ato build` writes `<layout dir>/<build>/<build>.kicad_pcb`. Point the KiCad
-viewer at it in `.k3eda.json`, for example `{"pcb": "layouts/default/default.kicad_pcb"}`,
-and the PCB tab refreshes after each successful build. See the
-[KiCad viewer guide](./kicad.md).
+When the workspace root holds an `ato.yaml`, the KiCad viewer recognises the
+project without configuration:
+
+- The PCB and 3D tabs show the first build's board (`<layout dir>/<build>/<build>.kicad_pcb`)
+  as soon as it exists. A `pcb` assignment in `.k3eda.json` still wins.
+- The header gains a **Build** button, with a build picker when `ato.yaml`
+  defines more than one build. It runs `ato build` in the project and shows the
+  outcome in a status strip: duration and warning count on success, or the first
+  error with its file and line on failure. Saved files refresh automatically
+  after a successful build.
+- The 3D tab reuses the build's own `.pcba.glb` when it is at least as new as
+  the board, so no `kicad-cli` export runs.
+- Gerbers from `ato build --target mfg-data` arrive as `<build>.gerber.zip`. The
+  viewer unpacks that archive into a `gerbers` folder next to it and shows the
+  layers in the Gerber tab.
+
+Anyone who can open the viewer for a project can start a build of it. Builds
+only regenerate that project's own outputs. See the
+[KiCad viewer guide](./kicad.md) for the other tabs.

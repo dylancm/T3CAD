@@ -97,3 +97,10 @@ export function createKiCadModelCache(runExport = exportModel) {
 }
 
 export const kiCadModelCache = createKiCadModelCache();
+
+/** atopile already ran `kicad-cli`; only the layer-naming pass is still needed. */
+async function copyPreparedGlb(source: string, output: string): Promise<void> {
+  await NodeFSP.writeFile(output, nameKiCadGlbLayers(await NodeFSP.readFile(source)));
+}
+
+export const atopileGlbCache = createKiCadModelCache(copyPreparedGlb);

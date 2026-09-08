@@ -501,3 +501,39 @@ body,
 .dark .design-workspace {
   --design-highlight: #8fbe9a;
 }
+
+/* atopile build control in the header and its result strip. */
+.design-build {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.design-build select {
+  appearance: none;
+  max-width: 120px;
+  border: 1px solid var(--design-line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.design-build button[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+.design-build-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 4px 8px 4px 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--design-line);
+}
+.design-build-status.is-failed {
+  color: var(--destructive, #c93c37);
+}
