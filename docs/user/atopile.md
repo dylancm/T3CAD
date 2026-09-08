@@ -16,9 +16,14 @@ order and does not install anything itself:
 3. `uv` on the PATH, in which case T3CAD runs the pinned PyPI release through
    `uv tool run`.
 
-Ask the agent to call `ato_status` to see which of these applied and the version
-found. Part picking in recent atopile releases requires an atopile account or a
-local parts service; see the atopile documentation for the version you run.
+**Settings → atopile** shows which of these applied, the exact command, and the
+version found, with a **Check again** button after you install or change the
+toolchain. Agents get the same information from `ato_status`. Part picking in
+recent atopile releases requires an atopile account or a local parts service;
+see the atopile documentation for the version you run.
+
+`.ato` files are highlighted in the file preview, diffs, search results, and
+code blocks using atopile's own grammar. Nothing needs enabling.
 
 ## Tools
 
@@ -32,6 +37,20 @@ local parts service; see the atopile documentation for the version you run.
 
 Prompts such as "add a pull-up on SDA and build" work without naming the tools;
 agents call `ato_build` after editing `.ato` files and fix the reported errors.
+
+## Skills
+
+Two atopile skills are available to every agent provider without installation,
+alongside the KiStack electronics skills:
+
+- `ato-language` carries atopile's own language rules and syntax reference for
+  writing and reviewing `.ato` files.
+- `atopile-t3cad` explains how to build and iterate inside T3CAD: check the
+  toolchain, read `ato.yaml`, build after every edit, fix the reported
+  diagnostics, and point you to the viewer's Design tab.
+
+Agents read them when a workspace holds an `ato.yaml`. They do not appear in the
+`$` skill picker, which lists only skills the provider itself discovers.
 
 ## In the KiCad viewer
 

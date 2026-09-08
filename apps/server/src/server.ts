@@ -37,6 +37,7 @@ import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import { layerConfig as SqlitePersistenceLayerLive } from "./persistence/Layers/Sqlite.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
+import { installAtopileSkills } from "./provider/AtopileSkills.ts";
 import { installKiStackSkills } from "./provider/KiStackSkills.ts";
 import { ProviderSessionDirectoryLive } from "./provider/Layers/ProviderSessionDirectory.ts";
 import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
@@ -597,6 +598,7 @@ export const makeServerLayer = Layer.unwrap(
 
     yield* fixPath();
     yield* Effect.tryPromise(() => installKiStackSkills());
+    yield* Effect.tryPromise(() => installAtopileSkills());
 
     const httpListeningLayer = Layer.effectDiscard(
       Effect.gen(function* () {

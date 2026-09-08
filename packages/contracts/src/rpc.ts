@@ -13,6 +13,7 @@ import {
 } from "./providerSetup.ts";
 
 import { ExternalLauncherError, LaunchEditorInput } from "./editor.ts";
+import { AtopileToolchainStatus } from "./atopile.ts";
 import {
   AuthAccessStreamError,
   AuthAccessStreamEvent,
@@ -335,6 +336,9 @@ export const WS_METHODS = {
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
 
+  // atopile toolchain methods
+  atopileGetToolchainStatus: "atopile.getToolchainStatus",
+
   // Cloud environment methods
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
@@ -508,6 +512,13 @@ const WsServerCommitDesktopUpdateRpc = Rpc.make(WS_METHODS.serverCommitDesktopUp
   payload: DesktopUpdateCommitInput,
   success: ServerSelfUpdateResult,
   error: Schema.Union([ServerSelfUpdateError, EnvironmentAuthorizationError]),
+});
+
+// Unavailability is part of the status payload, so the only failure is authorization.
+const WsAtopileGetToolchainStatusRpc = Rpc.make(WS_METHODS.atopileGetToolchainStatus, {
+  payload: Schema.Struct({}),
+  success: AtopileToolchainStatus,
+  error: EnvironmentAuthorizationError,
 });
 
 const WsServerGetSettingsRpc = Rpc.make(WS_METHODS.serverGetSettings, {
@@ -1215,6 +1226,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerReportClientActivityRpc,
   WsServerReportHostPowerStateRpc,
   WsServerGetBackgroundPolicyRpc,
+  WsAtopileGetToolchainStatusRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,
   WsPullRequestsListRpc,

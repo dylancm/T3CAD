@@ -9,6 +9,8 @@
 - [Terminal history](./user/terminal.md)
 - [Source control](./user/source-control.md)
 - [Project settings](./user/project-settings.md)
+- [KiCad viewer](./user/kicad.md)
+- [atopile projects](./user/atopile.md)
 - [Appearance and themes](./user/appearance.md)
 - [Keyboard shortcuts](./user/keybindings.md)
 - [Import browser sessions](./user/browser-import.md)
@@ -46,6 +48,7 @@ source alone does not explain. Most code changes do not need an internal documen
 - [Mobile development lifecycle](./internals/mobile-development.md)
 - [Terminal runtime](./internals/terminal-runtime.md)
 - [Voice input](./internals/voice-input.md)
+- [atopile as an external toolchain](./internals/atopile-toolchain.md)
 
 ### Runbooks
 
