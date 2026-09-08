@@ -14,6 +14,9 @@ describe("buildRuntimeInstructions", () => {
       expect(instructions).toContain("kicad-schematic");
       expect(instructions).toContain("kicad-bom");
       expect(instructions).toContain("pcb-product-render");
+      expect(instructions).toContain("<atopile_skills>");
+      expect(instructions).toContain("ato-language");
+      expect(instructions).toContain("atopile-t3cad");
     },
   );
 
