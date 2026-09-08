@@ -292,6 +292,10 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(ThreadPullRequestReactor.layer),
   Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
   Layer.provideMerge(DirectIosPush.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+  // Raw HTTP routes (POST /api/kicad/build) resolve services at request time from
+  // the served router's runtime, so the toolchain must live here rather than be
+  // provided onto the routes layer, which only satisfies the types.
+  Layer.provideMerge(AtopileToolchain.layer.pipe(Layer.provide(ProcessRunner.layer))),
   Layer.provideMerge(RuntimeReceiptBusLive),
 );
 
@@ -573,7 +577,6 @@ export const makeRoutesLayer = Layer.mergeAll(
   // and mutations observed on WebSocket invalidate patches subsequently read over HTTP.
   Layer.provide(PullRequestServiceLive),
   Layer.provide(PreviewAutomationBroker.layer),
-  Layer.provide(AtopileToolchain.layer.pipe(Layer.provide(ProcessRunner.layer))),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(DesktopAppUpdateLayerLive))),
   Layer.provide(commandReadinessLayer),
   Layer.provide(browserApiCorsLayer),
