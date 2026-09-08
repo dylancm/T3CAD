@@ -1019,6 +1019,13 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:process-diagnostics",
       tag: WS_METHODS.serverGetProcessDiagnostics,
     }),
+    // Probing runs `ato self-check`, which can take seconds through `uv tool run`;
+    // keep the answer until the user asks to check again.
+    atopileToolchainStatus: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:atopile:toolchain-status",
+      tag: WS_METHODS.atopileGetToolchainStatus,
+      staleTimeMs: 5 * 60_000,
+    }),
     hostResources: createEnvironmentQueryAtomFamily(runtime, {
       label: "environment-data:server:host-resources",
       staleTimeMs: 5_000,

@@ -8,6 +8,7 @@ export type SettingsPath =
   | "/settings/keybindings"
   | "/settings/providers"
   | "/settings/integrations"
+  | "/settings/atopile"
   | "/settings/source-control"
   | "/settings/connections"
   | "/settings/archived";
@@ -54,6 +55,8 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/keybindings": "Keybindings",
   "/settings/providers": "Providers",
   "/settings/integrations": "Integrations",
+  // Lowercase is the product's own spelling.
+  "/settings/atopile": "atopile",
   "/settings/source-control": "Source Control",
   "/settings/connections": "Connections",
   "/settings/archived": "Archive",
@@ -403,6 +406,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Auto-show floating preview",
     to: "/settings/integrations",
     searchTerms: ["agent opens browser pop into view hide"],
+  },
+  {
+    id: "atopile-toolchain",
+    title: "atopile toolchain",
+    to: "/settings/atopile",
+    searchTerms: ["ato", "atopile", "toolchain", "kicad"],
   },
   {
     id: "source-control",

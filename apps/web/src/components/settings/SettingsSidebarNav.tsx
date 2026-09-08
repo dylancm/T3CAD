@@ -14,6 +14,7 @@ import {
   ArchiveIcon,
   BlocksIcon,
   BotIcon,
+  CircuitBoardIcon,
   GitBranchIcon,
   PanelsTopLeftIcon,
   KeyboardIcon,
@@ -77,6 +78,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/keybindings": KeyboardIcon,
   "/settings/providers": BotIcon,
   "/settings/integrations": BlocksIcon,
+  "/settings/atopile": CircuitBoardIcon,
   "/settings/source-control": GitBranchIcon,
   "/settings/connections": Link2Icon,
   "/settings/archived": ArchiveIcon,
@@ -110,6 +112,7 @@ const SETTINGS_PAGE_SECTIONS: Partial<
     { label: "Motion", targetId: "motion" },
     { label: "Typography", targetId: "typography" },
   ],
+  "/settings/atopile": [{ label: "Toolchain", targetId: "atopile-toolchain" }],
   "/settings/source-control": [
     { label: "Version control", targetId: "source-control" },
     { label: "Text generation", targetId: "source-control-text-generation" },
