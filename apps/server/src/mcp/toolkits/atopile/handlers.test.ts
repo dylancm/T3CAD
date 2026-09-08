@@ -1,7 +1,8 @@
 import { AtopileInvalidInputError } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildArgs, resolveProjectDir } from "./handlers.ts";
+import { buildArgs } from "../../../atopile/atoBuild.ts";
+import { resolveProjectDir } from "./handlers.ts";
 
 describe("buildArgs", () => {
   it("runs every configured build with default targets when nothing is specified", () => {

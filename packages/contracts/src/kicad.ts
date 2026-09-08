@@ -32,11 +32,32 @@ export const KiCadProjectConfig = Schema.Struct({
 });
 export type KiCadProjectConfig = typeof KiCadProjectConfig.Type;
 
+/** One `builds:` entry of an atopile `ato.yaml`, with the outputs that exist right now. */
+export const KiCadAtopileBuild = Schema.Struct({
+  name: TrimmedNonEmptyString,
+  /** Project-relative board path this build writes, whether or not it exists yet. */
+  layoutPcb: TrimmedNonEmptyString,
+  layoutExists: Schema.Boolean,
+  /** Project-relative paths of generated outputs, present only when the file exists. */
+  glb: Schema.optionalKey(TrimmedNonEmptyString),
+  bomJson: Schema.optionalKey(TrimmedNonEmptyString),
+  gerberDir: Schema.optionalKey(TrimmedNonEmptyString),
+});
+export type KiCadAtopileBuild = typeof KiCadAtopileBuild.Type;
+
+export const KiCadAtopileProject = Schema.Struct({
+  configPath: TrimmedNonEmptyString,
+  builds: Schema.Array(KiCadAtopileBuild),
+});
+export type KiCadAtopileProject = typeof KiCadAtopileProject.Type;
+
 export const KiCadProjectManifest = Schema.Struct({
   root: TrimmedNonEmptyString,
   revision: TrimmedNonEmptyString,
   files: Schema.Array(KiCadProjectFile),
   config: Schema.optionalKey(KiCadProjectConfig),
+  /** Present when the workspace root holds an atopile `ato.yaml`. */
+  atopile: Schema.optionalKey(KiCadAtopileProject),
   warnings: Schema.Array(Schema.String),
 });
 export type KiCadProjectManifest = typeof KiCadProjectManifest.Type;

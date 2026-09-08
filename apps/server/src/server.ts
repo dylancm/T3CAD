@@ -24,6 +24,7 @@ import {
   kicadViewerSessionRouteLayer,
   kicadModelRouteLayer,
   iosNotificationRegistrationRouteLayer,
+  kicadBuildRouteLayer,
   kicadGerberRouteLayer,
 } from "./http.ts";
 import { guardHttpResponseWriteErrors } from "./httpResponseErrorGuard.ts";
@@ -561,6 +562,7 @@ export const makeRoutesLayer = Layer.mergeAll(
     kicadModelRouteLayer,
     iosNotificationRegistrationRouteLayer,
     kicadGerberRouteLayer,
+    kicadBuildRouteLayer,
     attachmentUploadRouteLayer,
     staticAndDevRouteLayer,
     websocketRpcRouteLayer,

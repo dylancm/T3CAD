@@ -13,10 +13,15 @@ import {
   List,
   FolderOpen,
   ChevronDown,
+  Hammer,
 } from "lucide-react";
 import "../index.css";
 import "./viewer.css";
-import type { KiCadProjectManifest } from "@t3tools/contracts";
+import type {
+  AtopileBuildResult,
+  KiCadAtopileProject,
+  KiCadProjectManifest,
+} from "@t3tools/contracts";
 type KiCadViewerSource = { filename: string; content: string };
 import { GerberBrowser } from "./GerberBrowser";
 import { NativeProjectViews } from "./NativeProjectViews";
@@ -24,6 +29,7 @@ import { LibraryView } from "./LibraryView";
 import { AnalysisView } from "./AnalysisView";
 import { BomView } from "./BomView";
 import { resolveProjectDesign } from "./projectDesign";
+import { type BuildState, summarizeBuild } from "./buildStatus";
 
 type View =
   | "gerbers"
@@ -36,6 +42,7 @@ type View =
   | "analysis"
   | "bom";
 type Manifest = KiCadProjectManifest & {
+  atopile?: KiCadAtopileProject;
   config?: {
     pcb?: string;
     schematic?: string;
@@ -81,6 +88,21 @@ async function readResponse(url: string, signal: AbortSignal) {
     throw new Error(
       (await response.text()).slice(0, 700) || `Unable to load project (${response.status})`,
     );
+  }
+  return response;
+}
+async function postJson(url: string, body: unknown, signal?: AbortSignal) {
+  const response = await fetch(url, {
+    method: "POST",
+    ...(signal ? { signal } : {}),
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403)
+      throw new Error("Viewer access expired. Reopen the KiCad panel to reconnect.");
+    throw new Error((await response.text()).slice(0, 700) || `Request failed (${response.status})`);
   }
   return response;
 }
@@ -175,6 +197,27 @@ function App() {
     !params.get("view") || params.get("view") === "pcb" || params.get("view") === "schematic",
   );
   const [refresh, setRefresh] = useState(0);
+  const [buildState, setBuildState] = useState<BuildState>({ status: "idle" });
+  const [buildName, setBuildName] = useState<string | undefined>(undefined);
+  const atopileBuilds = manifest?.atopile?.builds ?? [];
+  const activeBuild =
+    atopileBuilds.find((b) => b.name === buildName)?.name ?? atopileBuilds[0]?.name;
+  const runBuild = async () => {
+    if (buildState.status === "running") return;
+    setBuildState({ status: "running", build: activeBuild });
+    try {
+      const response = await postJson(apiUrl("build"), activeBuild ? { build: activeBuild } : {});
+      const result = (await response.json()) as AtopileBuildResult;
+      setBuildState({ status: "done", build: activeBuild, result });
+      if (result.ok) setRefresh((n) => n + 1);
+    } catch (cause) {
+      setBuildState({
+        status: "error",
+        build: activeBuild,
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  };
   const [localStep, setLocalStep] = useState<{ name: string; url: string } | null>(null);
   useEffect(
     () => () => {
@@ -263,7 +306,7 @@ function App() {
           ? files.filter((item) => item.path === configured)
           : libraryView && assignedLibrary && !selected[selectionKey]
             ? files.filter((item) => item.path === normalizedConfiguredLibrary)
-          : files;
+            : files;
   const file =
     selectableFiles.find((item) => item.path === selected[selectionKey]) ??
     selectableFiles.find((item) => item.path === configured) ??
@@ -308,6 +351,35 @@ function App() {
           <span />
           Saved files
         </span>
+        {atopileBuilds.length > 0 && (
+          <div className="design-build">
+            {atopileBuilds.length > 1 && (
+              <select
+                aria-label="atopile build to run"
+                value={activeBuild ?? ""}
+                onChange={(event) => setBuildName(event.target.value)}
+              >
+                {atopileBuilds.map((build) => (
+                  <option key={build.name} value={build.name}>
+                    {build.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              className="design-text-button"
+              disabled={buildState.status === "running"}
+              aria-busy={buildState.status === "running"}
+              onClick={() => {
+                void runBuild();
+              }}
+            >
+              <Hammer size={14} />{" "}
+              <span>{buildState.status === "running" ? "Building…" : "Build"}</span>
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className="kicad-icon-button"
@@ -431,19 +503,19 @@ function App() {
           <span className="design-source">
             {view === "step"
               ? "Recent first"
-                : designView
+              : designView
+                ? selected[selectionKey]
+                  ? "Preview override"
+                  : design.assigned
+                    ? "Assigned design"
+                    : "Project design"
+                : libraryView
                   ? selected[selectionKey]
                     ? "Preview override"
-                    : design.assigned
-                      ? "Assigned design"
-                      : "Project design"
-                  : libraryView
-                    ? selected[selectionKey]
-                      ? "Preview override"
-                      : assignedLibrary
-                        ? "Assigned library"
-                        : "Saved library"
-                : "Saved output"}
+                    : assignedLibrary
+                      ? "Assigned library"
+                      : "Saved library"
+                  : "Saved output"}
           </span>
           {(designView || libraryView) && (
             <button
@@ -529,6 +601,28 @@ function App() {
             {!browseFiles.length && <p>No matching design files.</p>}
           </div>
         </section>
+      )}
+      {buildState.status !== "idle" && (
+        <div
+          className={`design-build-status${
+            (buildState.status === "done" && !buildState.result.ok) || buildState.status === "error"
+              ? " is-failed"
+              : ""
+          }`}
+          role="status"
+        >
+          <span>{summarizeBuild(buildState)}</span>
+          {buildState.status !== "running" && (
+            <button
+              type="button"
+              className="kicad-icon-button"
+              aria-label="Dismiss build result"
+              onClick={() => setBuildState({ status: "idle" })}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       )}
       {!!manifest?.warnings?.length && (
         <div className="shrink-0 px-3 py-2 text-xs text-muted-foreground" role="status">

@@ -28,23 +28,36 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
 - **Phase 1** — `ato_status`, `ato_project`, `ato_build` MCP tools;
   toolchain resolution via `T3CAD_ATO_COMMAND` → PATH → `uv tool run`;
   structured build output parser; `docs/user/atopile.md`.
+- **Phase 2** — the KiCad manifest recognises `ato.yaml` (`manifest.atopile`
+  with per-build board, GLB, BOM, gerber directory), defaults the viewer to the
+  first built board, unpacks `<build>.gerber.zip` beside itself for the Gerber
+  tab, serves a fresh atopile GLB instead of running `kicad-cli`, and adds a
+  Build button plus result strip to the viewer header (web and mobile via the
+  shared page) backed by `POST /api/kicad/build`. The MCP handlers and the
+  route share `apps/server/src/atopile/atoBuild.ts`.
 
 ## Open: T3CAD
 
-### Phase 2 — project awareness in the KiCad panel
+### Phase 2 follow-ups
 
-- Detect `ato.yaml` in `apps/server/src/kicad/KiCadProject.ts` and derive
-  default PCB/GLB/BOM/Gerber locations from `paths.layout` and `builds`;
-  fold `.k3eda.json` overrides on top. Add `atopile?: { builds }` to the manifest.
-- Unpack `<name>.gerber.zip` to a temp dir for the Gerber tab (the tab wants
-  loose layer files and rejects `.gbrjob`).
-- Prefer atopile's `.pcba.glb` over running `kicad-cli` when present and newer.
-- Build-target select + Build button in the viewer header (web and mobile),
-  streaming through the terminal manager; status pill from the exit code.
-- Review the 50,000-entry scan cap and 300 ms manifest cache against a real
-  `build/` tree.
-- Decide the config surface: fold KiCad and atopile settings into `t3.json`
-  or commit to `.k3eda.json`. Do not add a third file.
+- Builds from the viewer run synchronously and return when `ato build` exits;
+  long builds show only "Building…". Streaming through the terminal manager was
+  deferred; the MCP `ato_build` result already carries the structured output.
+- A viewer-session token (minted with read scope) can start a build. Accepted
+  because the token is bound to one directory and a build only regenerates that
+  project's outputs; revisit if viewer links are ever shared more widely.
+- Config surface decided: no new file. `.k3eda.json` keeps viewer assignments
+  and atopile defaults are derived from `ato.yaml`; an explicit assignment wins.
+- The 50,000-entry scan cap and 300 ms manifest cache were reviewed against the
+  sample project (hundreds of files); no change needed, but a project with
+  years of `build/` output could approach the cap.
+- An upstream discovery test ("changes revision when an inspected file
+  changes…") failed once in a combined run and passed on every rerun; it relies
+  on mtime ordering within the same second. Not caused by this work, worth
+  hardening if it recurs.
+- The Build button was verified through unit and in-memory tests plus a manifest
+  smoke run on the sample project; KiCad is not installed on the dev machine, so
+  the GLB and gerber paths were exercised only with fixtures.
 
 ### Phase 3 — diagnostics, BOM, variables (needs re-scoping)
 

@@ -1,11 +1,18 @@
-import { IosNotificationRegistration } from "@t3tools/contracts";
+import {
+  AtopileExecutionError,
+  AtopileInvalidInputError,
+  AtopileProjectNotFoundError,
+  AtopileToolchainUnavailableError,
+  IosNotificationRegistration,
+} from "@t3tools/contracts";
+import { readAtoProject, runAtoBuild } from "./atopile/atoBuild.ts";
 import { DirectIosPushService } from "./notifications/DirectIosPushService.ts";
 // @effect-diagnostics globalDate:off globalDateInEffect:off globalErrorInEffectCatch:off globalErrorInEffectFailure:off
 import Mime from "@effect/platform-node/Mime";
 import * as NodeCrypto from "node:crypto";
 import { kiCadLibraryCache } from "./kicad/KiCadLibrary.ts";
 import { kiCadBomCache } from "./kicad/KiCadBom.ts";
-import { kiCadModelCache } from "./kicad/KiCadModel.ts";
+import { atopileGlbCache, kiCadModelCache } from "./kicad/KiCadModel.ts";
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
@@ -54,7 +61,11 @@ import {
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import { browserApiCorsAllowedHeaders, browserApiCorsAllowedMethods } from "./httpCors.ts";
-import { discoverKiCadProject, resolveKiCadProjectFile } from "./kicad/KiCadProject.ts";
+import {
+  discoverKiCadProject,
+  findFreshAtopileGlb,
+  resolveKiCadProjectFile,
+} from "./kicad/KiCadProject.ts";
 import { renderPrismGerber, renderPrismGerberComposite } from "./kicad/PrismGerber.ts";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
@@ -499,8 +510,16 @@ export const kicadModelRouteLayer = HttpRouter.add(
     const asset = yield* Effect.tryPromise(() => resolveKiCadProjectFile(cwd, requestedPath));
     if (!asset || asset.file.kind !== "pcb")
       return HttpServerResponse.text("PCB file not found", { status: 404 });
+    // An atopile build that already exported this board's GLB saves a kicad-cli run.
+    const atopileGlbPath = findFreshAtopileGlb(manifest, asset.file.path);
+    const atopileGlb = atopileGlbPath
+      ? yield* Effect.tryPromise(() => resolveKiCadProjectFile(cwd, atopileGlbPath))
+      : undefined;
     const outputPath = yield* Effect.tryPromise({
-      try: () => kiCadModelCache.get(asset.absolutePath, manifest.revision),
+      try: () =>
+        atopileGlb
+          ? atopileGlbCache.get(atopileGlb.absolutePath, manifest.revision)
+          : kiCadModelCache.get(asset.absolutePath, manifest.revision),
       catch: (cause) =>
         new Error(
           `KiCad GLB export failed: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -525,6 +544,58 @@ export const kicadModelRouteLayer = HttpRouter.add(
           error instanceof Error ? error.message : "KiCad GLB export failed",
           { status: 502 },
         ),
+      ),
+    ),
+  ),
+);
+
+const KiCadBuildRequest = Schema.Struct({
+  build: Schema.optional(Schema.String),
+  targets: Schema.optional(Schema.Array(Schema.String)),
+  timeoutMs: Schema.optional(Schema.Number),
+});
+
+/**
+ * Runs `ato build` in the viewer's project. A viewer-session token is accepted
+ * like the read routes: the token is minted by an authenticated client for one
+ * directory, and building only regenerates that project's own outputs.
+ */
+export const kicadBuildRouteLayer = HttpRouter.add(
+  "POST",
+  `${KICAD_ROUTE_PREFIX}/build`,
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = HttpServerRequest.toURL(request);
+    if (Option.isNone(url)) return HttpServerResponse.text("Bad Request", { status: 400 });
+    const sessionCwd = kicadSessionCwd(url.value);
+    if (!sessionCwd) yield* authenticateRawRouteWithScope(AuthOrchestrationReadScope);
+    const cwd = sessionCwd ?? url.value.searchParams.get("cwd");
+    if (!cwd) return HttpServerResponse.text("Missing cwd", { status: 400 });
+    const input = yield* request.json.pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(KiCadBuildRequest)),
+    );
+    const location = yield* readAtoProject(cwd);
+    const result = yield* runAtoBuild(location, input);
+    return yield* HttpServerResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  }).pipe(
+    Effect.catchTags({
+      EnvironmentAuthInvalidError: HttpServerRespondable.toResponse,
+      EnvironmentInternalError: HttpServerRespondable.toResponse,
+      EnvironmentScopeRequiredError: HttpServerRespondable.toResponse,
+      AtopileProjectNotFoundError: (error: AtopileProjectNotFoundError) =>
+        Effect.succeed(HttpServerResponse.text(error.message, { status: 404 })),
+      AtopileInvalidInputError: (error: AtopileInvalidInputError) =>
+        Effect.succeed(HttpServerResponse.text(error.message, { status: 400 })),
+      AtopileToolchainUnavailableError: (error: AtopileToolchainUnavailableError) =>
+        Effect.succeed(HttpServerResponse.text(error.message, { status: 503 })),
+      AtopileExecutionError: (error: AtopileExecutionError) =>
+        Effect.succeed(HttpServerResponse.text(error.message, { status: 502 })),
+    }),
+    Effect.catch((error) =>
+      Effect.succeed(
+        HttpServerResponse.text(error instanceof Error ? error.message : "atopile build failed", {
+          status: 400,
+        }),
       ),
     ),
   ),

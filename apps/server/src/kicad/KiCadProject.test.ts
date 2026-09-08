@@ -2,6 +2,7 @@
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import { discoverKiCadProject, resolveKiCadProjectFile } from "./KiCadProject.ts";
+import { storedZip } from "./testSupport.ts";
 import { afterEach, expect, vi } from "vite-plus/test";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -108,11 +109,14 @@ it.effect("reads explicit library assignments and reports missing assigned asset
     const root = tempRoot();
     NodeFS.mkdirSync(root, { recursive: true });
     NodeFS.writeFileSync(NodePath.join(root, "parts.kicad_sym"), "(kicad_symbol_lib)");
-    NodeFS.writeFileSync(NodePath.join(root, ".k3eda.json"), JSON.stringify({
-      symbol: "parts.kicad_sym",
-      symbolMember: "Controller",
-      footprint: "generated/controller.kicad_mod",
-    }));
+    NodeFS.writeFileSync(
+      NodePath.join(root, ".k3eda.json"),
+      JSON.stringify({
+        symbol: "parts.kicad_sym",
+        symbolMember: "Controller",
+        footprint: "generated/controller.kicad_mod",
+      }),
+    );
     const manifest = await discoverKiCadProject(root);
     expect(manifest.config).toMatchObject({
       symbol: "parts.kicad_sym",
@@ -123,4 +127,91 @@ it.effect("reads explicit library assignments and reports missing assigned asset
       "Configured footprint file not found: generated/controller.kicad_mod",
     );
   }),
+);
+
+const ATO_YAML = `requires-atopile: "^0.14.0"
+paths:
+  src: ./
+  layout: ./layouts
+builds:
+  default:
+    entry: main.ato:App
+  debug:
+    entry: main.ato:Debug
+`;
+
+it.effect(
+  "describes atopile builds, unpacks gerber archives, and defaults the viewer to the built board",
+  () =>
+    Effect.promise(async () => {
+      const root = tempRoot();
+      NodeFS.mkdirSync(NodePath.join(root, "layouts", "default"), { recursive: true });
+      NodeFS.mkdirSync(NodePath.join(root, "build", "builds", "default"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(root, "ato.yaml"), ATO_YAML);
+      NodeFS.writeFileSync(NodePath.join(root, "layouts", "default", "default.kicad_pcb"), "pcb");
+      NodeFS.writeFileSync(
+        NodePath.join(root, "build", "builds", "default", "default.pcba.glb"),
+        "glb",
+      );
+      NodeFS.writeFileSync(
+        NodePath.join(root, "build", "builds", "default", "default.bom.json"),
+        "[]",
+      );
+      NodeFS.writeFileSync(
+        NodePath.join(root, "build", "builds", "default", "default.gerber.zip"),
+        storedZip([
+          ["default-F_Cu.gbr", "G04 front*"],
+          ["default-Edge_Cuts.gbr", "G04 edge*"],
+        ]),
+      );
+      const manifest = await discoverKiCadProject(root);
+      expect(manifest.atopile).toEqual({
+        configPath: "ato.yaml",
+        builds: [
+          {
+            name: "default",
+            layoutPcb: "layouts/default/default.kicad_pcb",
+            layoutExists: true,
+            glb: "build/builds/default/default.pcba.glb",
+            bomJson: "build/builds/default/default.bom.json",
+            gerberDir: "build/builds/default/gerbers",
+          },
+          { name: "debug", layoutPcb: "layouts/debug/debug.kicad_pcb", layoutExists: false },
+        ],
+      });
+      expect(manifest.config).toEqual({
+        pcb: "layouts/default/default.kicad_pcb",
+        gerbers: ["build/builds/default/gerbers"],
+      });
+      expect(
+        manifest.files.filter((file) => file.kind === "gerber").map((file) => file.path),
+      ).toEqual([
+        "build/builds/default/gerbers/default-Edge_Cuts.gbr",
+        "build/builds/default/gerbers/default-F_Cu.gbr",
+      ]);
+      expect(manifest.warnings).toEqual([]);
+    }),
+);
+
+it.effect(
+  "keeps explicit .k3eda.json assignments over atopile defaults and flags a bad ato.yaml",
+  () =>
+    Effect.promise(async () => {
+      const root = tempRoot();
+      NodeFS.mkdirSync(NodePath.join(root, "layouts", "default"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(root, "ato.yaml"), ATO_YAML);
+      NodeFS.writeFileSync(NodePath.join(root, "layouts", "default", "default.kicad_pcb"), "pcb");
+      NodeFS.writeFileSync(NodePath.join(root, "other.kicad_pcb"), "pcb");
+      NodeFS.writeFileSync(NodePath.join(root, ".k3eda.json"), '{"pcb":"other.kicad_pcb"}');
+      const manifest = await discoverKiCadProject(root);
+      expect(manifest.config?.pcb).toBe("other.kicad_pcb");
+      expect(manifest.atopile?.builds[0]?.layoutExists).toBe(true);
+
+      const broken = tempRoot();
+      NodeFS.mkdirSync(broken, { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(broken, "ato.yaml"), "builds: [not: a: map");
+      const brokenManifest = await discoverKiCadProject(broken);
+      expect(brokenManifest.atopile).toBeUndefined();
+      expect(brokenManifest.warnings).toContain("Unable to parse ato.yaml");
+    }),
 );
