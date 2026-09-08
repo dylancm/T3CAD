@@ -101,6 +101,16 @@ check`; the March `ato validate` crashes. If a working validate appears,
 
 ### Smaller T3CAD items
 
+- Raw `HttpRouter` handlers resolve services from the served router's runtime,
+  not from `Layer.provide` on the routes layer (that only satisfies the types).
+  The build route shipped with exactly that bug and answered 500 until the
+  toolchain moved into `ReactorLayerLive`. A route-level test that serves
+  `kicadBuildRouteLayer` through `HttpRouter.serve` with a stub toolchain would
+  catch a regression; none exists yet.
+- Server restarts drop viewer-session tokens (in-memory), so an open KiCad
+  panel shows "Viewer access expired" until reopened. Persisting sessions or
+  auto re-minting from the host panel on 401 would smooth dev iterations.
+
 - `T3CAD_ATO_COMMAND` is an environment variable; a per-project or Settings
   entry would be friendlier. Environment variables also cannot carry
   `FBRK_LOG_DIR`, needed when mixing atopile versions on one machine.
