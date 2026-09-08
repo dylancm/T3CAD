@@ -45,9 +45,20 @@ export const KiCadAtopileBuild = Schema.Struct({
 });
 export type KiCadAtopileBuild = typeof KiCadAtopileBuild.Type;
 
+/** Outcome of the most recent `ato build` this server ran for the project. */
+export const KiCadAtopileLastBuild = Schema.Struct({
+  finishedAt: Schema.Number,
+  ok: Schema.Boolean,
+  build: Schema.optionalKey(TrimmedNonEmptyString),
+  errors: Schema.Number,
+  warnings: Schema.Number,
+});
+export type KiCadAtopileLastBuild = typeof KiCadAtopileLastBuild.Type;
+
 export const KiCadAtopileProject = Schema.Struct({
   configPath: TrimmedNonEmptyString,
   builds: Schema.Array(KiCadAtopileBuild),
+  lastBuild: Schema.optionalKey(KiCadAtopileLastBuild),
 });
 export type KiCadAtopileProject = typeof KiCadAtopileProject.Type;
 

@@ -13,12 +13,14 @@ import {
   List,
   FolderOpen,
   ChevronDown,
+  ClipboardList,
   Hammer,
 } from "lucide-react";
 import "../index.css";
 import "./viewer.css";
 import type {
   AtopileBuildResult,
+  AtopileReport,
   KiCadAtopileProject,
   KiCadProjectManifest,
 } from "@t3tools/contracts";
@@ -28,6 +30,7 @@ import { NativeProjectViews } from "./NativeProjectViews";
 import { LibraryView } from "./LibraryView";
 import { AnalysisView } from "./AnalysisView";
 import { BomView } from "./BomView";
+import { DesignView } from "./DesignView";
 import { resolveProjectDesign } from "./projectDesign";
 import { type BuildState, summarizeBuild } from "./buildStatus";
 
@@ -40,7 +43,8 @@ type View =
   | "footprint"
   | "symbol"
   | "analysis"
-  | "bom";
+  | "bom"
+  | "design";
 type Manifest = KiCadProjectManifest & {
   atopile?: KiCadAtopileProject;
   config?: {
@@ -66,6 +70,7 @@ const optionalTabs = [
   { id: "footprint", label: "Footprints", icon: Shapes },
   { id: "symbol", label: "Symbols", icon: Cpu },
   { id: "analysis", label: "Analysis", icon: Radio },
+  { id: "design", label: "Design", icon: ClipboardList },
 ] as const;
 const allTabs = [...tabs, ...optionalTabs];
 const params = new URLSearchParams(location.hash.slice(1));
@@ -460,16 +465,18 @@ function App() {
             }}
           >
             <option value="">Tools</option>
-            {optionalTabs.map((tab) => (
-              <option key={tab.id} value={tab.id}>
-                {tab.label}
-              </option>
-            ))}
+            {optionalTabs
+              .filter((tab) => tab.id !== "design" || manifest?.atopile)
+              .map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
           </select>
           <ChevronDown size={12} aria-hidden="true" />
         </div>
       </nav>
-      {view !== "analysis" && (
+      {view !== "analysis" && view !== "design" && (
         <div className="design-filebar">
           <div className="design-file-identity">
             <FileText size={14} aria-hidden="true" />
@@ -683,6 +690,22 @@ function App() {
                 />
               </div>
             )}
+            {view === "design" &&
+              (activeBuild ? (
+                <DesignView
+                  build={activeBuild}
+                  revision={`${revision}:${refresh}:${manifest.atopile?.lastBuild?.finishedAt ?? 0}`}
+                  read={async (signal) => {
+                    const url = new URL(apiUrl("ato-report", undefined, revision));
+                    url.searchParams.set("build", activeBuild);
+                    return (
+                      await readResponse(url.toString(), signal)
+                    ).json() as Promise<AtopileReport>;
+                  }}
+                />
+              ) : (
+                <Notice text="The Design tab needs an atopile project (ato.yaml) at the workspace root." />
+              ))}
             {view === "bom" &&
               (file ? (
                 <BomView

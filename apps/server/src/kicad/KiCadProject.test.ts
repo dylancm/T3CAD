@@ -63,6 +63,13 @@ it.effect(
         new Date(Date.now() + 1000),
       );
       NodeFS.writeFileSync(NodePath.join(root, "board.kicad_pcb"), "two");
+      // writeFileSync stamps "now"; on a fast run that can equal the first scan's
+      // mtime at millisecond resolution, so move it explicitly.
+      NodeFS.utimesSync(
+        NodePath.join(root, "board.kicad_pcb"),
+        new Date(),
+        new Date(Date.now() + 2000),
+      );
       vi.spyOn(Date, "now").mockReturnValue(Date.now() + 350);
       expect((await discoverKiCadProject(root)).revision).not.toBe(first.revision);
       expect(await resolveKiCadProjectFile(root, "../outside.kicad_pcb")).toBeUndefined();

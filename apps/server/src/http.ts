@@ -6,6 +6,7 @@ import {
   IosNotificationRegistration,
 } from "@t3tools/contracts";
 import { readAtoProject, runAtoBuild } from "./atopile/atoBuild.ts";
+import { readAtoReport } from "./atopile/atoReport.ts";
 import { DirectIosPushService } from "./notifications/DirectIosPushService.ts";
 // @effect-diagnostics globalDate:off globalDateInEffect:off globalErrorInEffectCatch:off globalErrorInEffectFailure:off
 import Mime from "@effect/platform-node/Mime";
@@ -716,6 +717,21 @@ export const kicadProjectRouteLayer = HttpRouter.add(
             ),
           ),
         ),
+      );
+    }
+    if (suffix === "ato-report") {
+      const build = url.value.searchParams.get("build");
+      if (!build) return HttpServerResponse.text("Missing build", { status: 400 });
+      const location = yield* readAtoProject(cwd).pipe(
+        Effect.catchTags({
+          AtopileProjectNotFoundError: () => Effect.succeed(undefined),
+          AtopileInvalidInputError: () => Effect.succeed(undefined),
+        }),
+      );
+      if (!location) return HttpServerResponse.text("Not an atopile project", { status: 404 });
+      return yield* HttpServerResponse.json(
+        yield* Effect.tryPromise(() => readAtoReport(location.projectDir, location.config, build)),
+        { headers: { "Cache-Control": "no-store" } },
       );
     }
     if (suffix === "bom") {

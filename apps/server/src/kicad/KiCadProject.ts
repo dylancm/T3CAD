@@ -11,6 +11,7 @@ import {
   expectedArtifacts,
   parseAtoConfig,
 } from "../atopile/atoProject.ts";
+import { getLastAtoBuild } from "../atopile/atoReport.ts";
 import { extractArchiveIfStale } from "./GerberArchive.ts";
 
 export type KiCadFileKind =
@@ -39,9 +40,17 @@ export interface KiCadAtopileBuild {
   readonly bomJson?: string;
   readonly gerberDir?: string;
 }
+export interface KiCadAtopileLastBuild {
+  readonly finishedAt: number;
+  readonly ok: boolean;
+  readonly build?: string;
+  readonly errors: number;
+  readonly warnings: number;
+}
 export interface KiCadAtopileProject {
   readonly configPath: string;
   readonly builds: readonly KiCadAtopileBuild[];
+  readonly lastBuild?: KiCadAtopileLastBuild;
 }
 
 export interface KiCadProjectManifest {
@@ -377,7 +386,17 @@ async function describeAtopileBuilds(
       ...(gerberDir ? { gerberDir } : {}),
     });
   }
-  return { configPath: scan.configPath, builds };
+  const last = getLastAtoBuild(projectRoot);
+  const lastBuild: KiCadAtopileLastBuild | undefined = last
+    ? {
+        finishedAt: last.finishedAt,
+        ok: last.result.ok,
+        ...(last.build === undefined ? {} : { build: last.build }),
+        errors: last.result.errors.length,
+        warnings: last.result.warnings.length,
+      }
+    : undefined;
+  return { configPath: scan.configPath, builds, ...(lastBuild ? { lastBuild } : {}) };
 }
 
 /**

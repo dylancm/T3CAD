@@ -140,6 +140,53 @@ export const AtopileProjectInfo = Schema.Struct({
 });
 export type AtopileProjectInfo = typeof AtopileProjectInfo.Type;
 
+/** One BOM line as atopile's `<build>.bom.json` records it, with designators merged. */
+export const AtopileBomLine = Schema.Struct({
+  designators: Schema.Array(Schema.String),
+  quantity: Schema.Number,
+  value: Schema.String,
+  mpn: Schema.String,
+  manufacturer: Schema.String,
+  lcsc: Schema.String,
+  package: Schema.String,
+  type: Schema.String,
+  description: Schema.String,
+  unitCost: Schema.optionalKey(Schema.Number),
+  stock: Schema.optionalKey(Schema.Number),
+  isBasic: Schema.Boolean,
+  source: Schema.String,
+});
+export type AtopileBomLine = typeof AtopileBomLine.Type;
+
+/** One solved parameter from `<build>.variables.json`, flattened with its module path. */
+export const AtopileVariableRow = Schema.Struct({
+  path: Schema.String,
+  typeName: Schema.String,
+  name: Schema.String,
+  spec: Schema.NullOr(Schema.String),
+  actual: Schema.NullOr(Schema.String),
+  unit: Schema.NullOr(Schema.String),
+  source: Schema.NullOr(Schema.String),
+  meetsSpec: Schema.NullOr(Schema.Boolean),
+});
+export type AtopileVariableRow = typeof AtopileVariableRow.Type;
+
+export const AtopileLastBuild = Schema.Struct({
+  finishedAt: Schema.Number,
+  result: AtopileBuildResult,
+});
+export type AtopileLastBuild = typeof AtopileLastBuild.Type;
+
+/** Everything the viewer's Design tab shows for one build. */
+export const AtopileReport = Schema.Struct({
+  build: Schema.String,
+  lastBuild: Schema.optionalKey(AtopileLastBuild),
+  bom: Schema.optionalKey(Schema.Array(AtopileBomLine)),
+  variables: Schema.optionalKey(Schema.Array(AtopileVariableRow)),
+  warnings: Schema.Array(Schema.String),
+});
+export type AtopileReport = typeof AtopileReport.Type;
+
 export class AtopileToolchainUnavailableError extends Schema.TaggedErrorClass<AtopileToolchainUnavailableError>()(
   "AtopileToolchainUnavailableError",
   { detail: Schema.String },
