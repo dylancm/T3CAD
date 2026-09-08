@@ -17,6 +17,7 @@ import * as FileSystem from "effect/FileSystem";
 
 import * as AtopileToolchain from "./AtopileToolchain.ts";
 import { type AtoBuildTarget, parseAtoBuildOutput, stripAnsi } from "./atoOutput.ts";
+import { recordAtoBuild } from "./atoReport.ts";
 import {
   ATO_CONFIG_FILENAME,
   type AtoProjectConfig,
@@ -172,7 +173,7 @@ export const runAtoBuild = Effect.fn("atopile.runAtoBuild")(function* (
     }
   }
 
-  return {
+  const result: AtopileBuildResult = {
     ok: parsed.ok && !run.timedOut,
     exitCode,
     durationMs: finishedAt - startedAt,
@@ -184,4 +185,6 @@ export const runAtoBuild = Effect.fn("atopile.runAtoBuild")(function* (
     artifacts,
     outputTail: stripAnsi(combined).trimEnd().slice(-OUTPUT_TAIL_CHARS),
   };
+  recordAtoBuild(projectDir, input.build, result, finishedAt);
+  return result;
 });

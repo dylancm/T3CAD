@@ -35,6 +35,14 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   Build button plus result strip to the viewer header (web and mobile via the
   shared page) backed by `POST /api/kicad/build`. The MCP handlers and the
   route share `apps/server/src/atopile/atoBuild.ts`.
+- **Phase 3** — re-scoped to the CLI: no sidecar. A "Design" tab in the viewer
+  (Tools menu, atopile projects only) shows the last build this server ran
+  (stages, errors with `file:line`, warnings), the picked BOM with unit cost,
+  stock, and library class from `<build>.bom.json`, and every solved parameter
+  against its spec from `<build>.variables.json`, out-of-spec rows highlighted.
+  Served by `GET /api/kicad/ato-report?build=`. Builds from `ato_build` and the
+  Build button both register in an in-memory last-build record that the manifest
+  summarises, so the tab refreshes after agent builds too.
 
 ## Open: T3CAD
 
@@ -59,16 +67,18 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   smoke run on the sample project; KiCad is not installed on the dev machine, so
   the GLB and gerber paths were exercised only with fixtures.
 
-### Phase 3 — diagnostics, BOM, variables (needs re-scoping)
+### Phase 3 follow-ups
 
-- The plan assumed `ato serve backend` with `/api/problems`, `/api/bom`,
-  `/api/variables`. atopile 0.15.8 ships `ato serve core` instead: RPC-style
-  kicad/layout/diff domains and only a `/ws/logs` route. The March source has
-  the old server. Re-survey before building a sidecar; the CLI-only path
-  (parse `ato build` output, read `build/builds/<name>/*.json`) may be enough.
-- A "Design" tab: problems with severity and `file:line`, BOM from
-  `<name>.bom.json`, variables from `<name>.variables.json`.
-- Feed problems into `ato_build` results (already carries stage errors).
+- The last-build record is in memory only; a server restart loses it until the
+  next build. Persisting it would mean writing into the user's project or the
+  T3 data directory; neither felt justified yet.
+- `meetsSpec` is `null` for every row in the March source's variables report,
+  so the out-of-spec highlight is wired but untested against real data.
+- The Design tab reads whole reports on every manifest revision change; fine for
+  boards with hundreds of parts, worth paging past a few thousand.
+- Problems still come only from build output. atopile has no separate `ato
+check`; the March `ato validate` crashes. If a working validate appears,
+  surface it here as pre-build diagnostics.
 
 ### Phase 4 — embed atopile's own panels (elective)
 

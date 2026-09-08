@@ -51,6 +51,12 @@ project without configuration:
   viewer unpacks that archive into a `gerbers` folder next to it and shows the
   layers in the Gerber tab.
 
+- **Tools, then Design** opens a tab with the last build's outcome and
+  diagnostics, the picked bill of materials with unit costs and stock, and every
+  solved parameter next to its spec, with out-of-spec rows highlighted. It reads
+  the `.bom.json` and `.variables.json` reports `ato build` writes, so it reflects
+  builds started by agents as well as by the Build button.
+
 Anyone who can open the viewer for a project can start a build of it. Builds
 only regenerate that project's own outputs. See the
 [KiCad viewer guide](./kicad.md) for the other tabs.
