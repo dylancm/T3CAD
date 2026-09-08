@@ -422,7 +422,14 @@ function App() {
           }}
         >
           {allTabs
-            .filter((tab) => tabs.some((base) => base.id === tab.id) || openTabs.includes(tab.id))
+            .filter(
+              (tab) =>
+                tabs.some((base) => base.id === tab.id) ||
+                openTabs.includes(tab.id) ||
+                // atopile projects get Design as a permanent tab; the Tools menu
+                // collapses to "···" in a narrow panel and hides it otherwise.
+                (tab.id === "design" && manifest?.atopile !== undefined),
+            )
             .map(({ id, label, icon: Icon }) => (
               <div key={id} className="design-tab-wrap">
                 <button
@@ -466,7 +473,7 @@ function App() {
           >
             <option value="">Tools</option>
             {optionalTabs
-              .filter((tab) => tab.id !== "design" || manifest?.atopile)
+              .filter((tab) => tab.id !== "design")
               .map((tab) => (
                 <option key={tab.id} value={tab.id}>
                   {tab.label}
