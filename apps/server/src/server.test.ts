@@ -5,6 +5,7 @@ import * as NodeCrypto from "node:crypto";
 import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 
 import {
+  AtopileToolchainUnavailableError,
   AuthAccessTokenType,
   AuthStandardClientScopes,
   AuthEnvironmentBootstrapTokenType,
@@ -95,6 +96,7 @@ const decodeTransferShellSnapshot = Schema.decodeUnknownEffect(
 );
 const encodeTestJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
+import * as AtopileToolchain from "./atopile/AtopileToolchain.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
 import * as ServerConfig from "./config.ts";
 import { HTTP_ROUTER_CONFIG, makeRoutesLayer } from "./server.ts";
@@ -748,6 +750,14 @@ const buildAppUnderTest = (options?: {
           Layer.succeed(DirectIosPushService, {
             register: () => Effect.succeed({ configured: false }),
           }),
+          Layer.succeed(
+            AtopileToolchain.AtopileToolchain,
+            AtopileToolchain.AtopileToolchain.of({
+              status: () => Effect.succeed({ available: false, command: [] }),
+              run: () =>
+                Effect.fail(new AtopileToolchainUnavailableError({ detail: "no `ato` in tests" })),
+            }),
+          ),
           Layer.mock(Keybindings.Keybindings)({
             loadConfigState: Effect.succeed({
               keybindings: [],
