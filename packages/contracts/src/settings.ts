@@ -784,6 +784,19 @@ export const ObservabilitySettings = Schema.Struct({
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
+/**
+ * Where the atopile toolchain comes from on this machine. Both fields are
+ * environment-local: a command line or log directory only makes sense on the
+ * server that runs `ato`, so neither joins the shared-settings sync set.
+ */
+export const AtopileSettings = Schema.Struct({
+  /** Full `ato` command line; empty falls through to the environment lookup. */
+  command: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  /** `FBRK_LOG_DIR` for every `ato` process; empty leaves it unset. */
+  logDir: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+});
+export type AtopileSettings = typeof AtopileSettings.Type;
+
 export const SourceControlWritingStyleMode = Schema.Literals([
   "repo_conventions",
   "conventional_commits",
@@ -976,6 +989,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  atopile: AtopileSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   // Keyed by a user-chosen id so a source keeps its rows across edits. Entries
   // this build cannot decode round-trip untouched, as provider instances do.
   usageLimitSources: Schema.Record(UsageLimitSourceId, UsageLimitSourceConfig).pipe(
@@ -1186,6 +1200,12 @@ export const ServerSettingsPatch = Schema.Struct({
     Schema.Struct({
       otlpTracesUrl: Schema.optionalKey(TrimmedString),
       otlpMetricsUrl: Schema.optionalKey(TrimmedString),
+    }),
+  ),
+  atopile: Schema.optionalKey(
+    Schema.Struct({
+      command: Schema.optionalKey(TrimmedString),
+      logDir: Schema.optionalKey(TrimmedString),
     }),
   ),
   providers: Schema.optionalKey(

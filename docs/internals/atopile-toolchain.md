@@ -2,8 +2,9 @@
 
 T3CAD never vendors, pins in `package.json`, or installs the atopile compiler. The
 [toolchain service](../../apps/server/src/atopile/AtopileToolchain.ts) resolves an `ato` command at
-request time (`T3CAD_ATO_COMMAND`, then PATH, then `uv tool run` of a pinned release) and every
-caller treats "not found" as ordinary data, not a startup failure. atopile is a Python package with
+request time (the `atopile.command` server setting, then `T3CAD_ATO_COMMAND`, then PATH, then
+`uv tool run` of a pinned release) and every caller treats "not found" as ordinary data, not a
+startup failure. Settings are re-read on every resolution so an edit applies to the next build. atopile is a Python package with
 a compiled core, moves on its own release cadence, and its public source went stale in 2026 while
 the PyPI releases kept changing behaviour (the 0.15 line gates part lookups behind an account).
 Bundling any one version would tie T3CAD releases to atopile's, break users who need a different

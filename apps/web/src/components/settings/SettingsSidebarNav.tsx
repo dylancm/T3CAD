@@ -112,7 +112,10 @@ const SETTINGS_PAGE_SECTIONS: Partial<
     { label: "Motion", targetId: "motion" },
     { label: "Typography", targetId: "typography" },
   ],
-  "/settings/atopile": [{ label: "Toolchain", targetId: "atopile-toolchain" }],
+  "/settings/atopile": [
+    { label: "Toolchain", targetId: "atopile-toolchain" },
+    { label: "Configuration", targetId: "atopile-configuration" },
+  ],
   "/settings/source-control": [
     { label: "Version control", targetId: "source-control" },
     { label: "Text generation", targetId: "source-control-text-generation" },

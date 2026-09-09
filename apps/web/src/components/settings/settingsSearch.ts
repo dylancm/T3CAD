@@ -414,6 +414,20 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ato", "atopile", "toolchain", "kicad"],
   },
   {
+    id: "atopile-configuration",
+    title: "atopile configuration",
+    to: "/settings/atopile",
+    searchTerms: [
+      "ato command",
+      "T3CAD_ATO_COMMAND",
+      "FBRK_LOG_DIR",
+      "log directory",
+      "atopile",
+      "toolchain",
+      "uv",
+    ],
+  },
+  {
     id: "source-control",
     title: "Source control",
     to: "/settings/source-control",

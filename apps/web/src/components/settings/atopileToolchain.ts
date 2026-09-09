@@ -2,6 +2,7 @@ import type { AtopileToolchainSource, AtopileToolchainStatus } from "@t3tools/co
 
 /** Human labels for where the server found `ato`, in resolution order. */
 export const ATOPILE_TOOLCHAIN_SOURCE_LABELS: Readonly<Record<AtopileToolchainSource, string>> = {
+  setting: "ato command setting",
   env: "T3CAD_ATO_COMMAND environment variable",
   path: "ato on PATH",
   uv: "uv tool run, pinned release",

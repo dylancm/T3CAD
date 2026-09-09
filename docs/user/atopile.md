@@ -10,17 +10,22 @@ viewer picks up the board the build writes.
 The environment running T3CAD needs the `ato` compiler. T3CAD looks for it in this
 order and does not install anything itself:
 
-1. `T3CAD_ATO_COMMAND`, an environment variable holding a full command line, for
-   example `uv run --project /src/atopile ato` for a source checkout.
-2. `ato` on the PATH.
-3. `uv` on the PATH, in which case T3CAD runs the pinned PyPI release through
+1. The **ato command** in **Settings → atopile**, a full command line such as
+   `uv run --project /src/atopile ato` for a source checkout. It is saved per
+   server, so each machine can point at its own install.
+2. `T3CAD_ATO_COMMAND`, the same command line as an environment variable.
+3. `ato` on the PATH.
+4. `uv` on the PATH, in which case T3CAD runs the pinned PyPI release through
    `uv tool run`.
 
 **Settings → atopile** shows which of these applied, the exact command, and the
 version found, with a **Check again** button after you install or change the
-toolchain. Agents get the same information from `ato_status`. Part picking in
-recent atopile releases requires an atopile account or a local parts service;
-see the atopile documentation for the version you run.
+toolchain; edits to the command re-check automatically. The **Log directory**
+setting on the same page tells atopile where to write its build logs
+(`FBRK_LOG_DIR`), which keeps two atopile versions on one machine from sharing
+a log database. Agents get the same information from `ato_status`. Part picking
+in recent atopile releases requires an atopile account or a local parts
+service; see the atopile documentation for the version you run.
 
 `.ato` files are highlighted in the file preview, diffs, search results, and
 code blocks using atopile's own grammar. Nothing needs enabling.

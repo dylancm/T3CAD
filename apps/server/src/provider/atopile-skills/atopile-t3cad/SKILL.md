@@ -24,8 +24,9 @@ instead of running `ato` in a shell.
 ## Workflow
 
 1. Call `ato_status` once at the start. It reports whether `ato` is available,
-   which command T3CAD uses to run it (an explicit `T3CAD_ATO_COMMAND`, `ato` on
-   the PATH, or the pinned release through `uv tool run`) and the version.
+   which command T3CAD uses to run it (the ato command from Settings → atopile,
+   an explicit `T3CAD_ATO_COMMAND`, `ato` on the PATH, or the pinned release
+   through `uv tool run`) and the version.
 2. Call `ato_project` to read `ato.yaml`: the build names, each build's entry
    module (`file.ato:Module`), where each build writes its `.kicad_pcb`, and
    the source, layout and build directories. Use the build names it returns

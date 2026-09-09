@@ -4,8 +4,8 @@ import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 const PROJECT_DIR_DESCRIPTION =
   "Directory holding ato.yaml, relative to the workspace root or absolute within it. Omit to use the workspace root.";
 
-/** Where the `ato` executable came from. */
-export const AtopileToolchainSource = Schema.Literals(["env", "path", "uv"]);
+/** Where the `ato` executable came from, in resolution order. */
+export const AtopileToolchainSource = Schema.Literals(["setting", "env", "path", "uv"]);
 export type AtopileToolchainSource = typeof AtopileToolchainSource.Type;
 
 export const AtopileToolchainStatus = Schema.Struct({
@@ -14,6 +14,8 @@ export const AtopileToolchainStatus = Schema.Struct({
   command: Schema.Array(Schema.String),
   source: Schema.optionalKey(AtopileToolchainSource),
   version: Schema.optionalKey(Schema.String),
+  /** `FBRK_LOG_DIR` handed to every `ato` process, when configured. */
+  logDir: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.String),
 });
 export type AtopileToolchainStatus = typeof AtopileToolchainStatus.Type;

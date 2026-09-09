@@ -556,6 +556,23 @@ describe("ServerSettingsPatch.providerInstances", () => {
   });
 });
 
+describe("ServerSettings atopile", () => {
+  it("defaults to an unset command and log directory", () => {
+    expect(DEFAULT_SERVER_SETTINGS.atopile).toEqual({ command: "", logDir: "" });
+    expect(decodeServerSettings({ atopile: { command: "ato" } }).atopile).toEqual({
+      command: "ato",
+      logDir: "",
+    });
+  });
+
+  it("trims both fields so whitespace reads as unset", () => {
+    const patch = decodeServerSettingsPatch({
+      atopile: { command: "  uv run --project /src/atopile ato  ", logDir: "   " },
+    });
+    expect(patch.atopile).toEqual({ command: "uv run --project /src/atopile ato", logDir: "" });
+  });
+});
+
 describe("ServerSettingsPatch string normalization", () => {
   it("trims string settings while decoding patches", () => {
     const patch = decodeServerSettingsPatch({

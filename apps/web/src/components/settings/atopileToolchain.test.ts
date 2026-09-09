@@ -24,6 +24,7 @@ describe("formatAtopileToolchainStatusLabel", () => {
 
 describe("formatAtopileToolchainSource", () => {
   it("names each resolution step in the server's own words", () => {
+    expect(formatAtopileToolchainSource("setting")).toBe("ato command setting");
     expect(formatAtopileToolchainSource("env")).toBe("T3CAD_ATO_COMMAND environment variable");
     expect(formatAtopileToolchainSource("path")).toBe("ato on PATH");
     expect(formatAtopileToolchainSource("uv")).toBe("uv tool run, pinned release");
@@ -34,7 +35,12 @@ describe("formatAtopileToolchainSource", () => {
   });
 
   it("covers every source the contract allows", () => {
-    expect(Object.keys(ATOPILE_TOOLCHAIN_SOURCE_LABELS).toSorted()).toEqual(["env", "path", "uv"]);
+    expect(Object.keys(ATOPILE_TOOLCHAIN_SOURCE_LABELS).toSorted()).toEqual([
+      "env",
+      "path",
+      "setting",
+      "uv",
+    ]);
   });
 });
 
