@@ -88,7 +88,10 @@ const projectionLayer = (workspaceRoot: string) =>
     } as unknown as ProjectionSnapshotQuery.ProjectionSnapshotQuery["Service"]),
   );
 
-/** Toolchain stub that records the run and writes the board the real build would. */
+/**
+ * Toolchain stub that records the run; `build` writes the board the real
+ * build would, `validate` echoes every file as ok.
+ */
 const toolchainLayer = (runs: AtopileToolchain.AtopileRunInput[]) =>
   Layer.effect(
     AtopileToolchain.AtopileToolchain,
@@ -101,6 +104,18 @@ const toolchainLayer = (runs: AtopileToolchain.AtopileRunInput[]) =>
         run: (input) =>
           Effect.gen(function* () {
             runs.push(input);
+            if (input.args[0] === "validate") {
+              return {
+                command: ["ato"],
+                exitCode: 0,
+                stdout: input.args
+                  .slice(1)
+                  .map((file) => `${file}: ok\n`)
+                  .join(""),
+                stderr: "",
+                timedOut: false,
+              };
+            }
             const board = path.join(input.cwd, "layouts", "default", "default.kicad_pcb");
             yield* fs.makeDirectory(path.dirname(board), { recursive: true });
             yield* fs.writeFileString(board, "(kicad_pcb)");
@@ -129,6 +144,7 @@ const withProject = <A, E>(
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3cad-ato-mcp-" });
       yield* fs.writeFileString(path.join(root, "ato.yaml"), ATO_YAML);
+      yield* fs.writeFileString(path.join(root, "main.ato"), "module App:\n    pass\n");
       const runs: AtopileToolchain.AtopileRunInput[] = [];
       const layer = McpHttpServer.AtopileToolkitRegistrationLive.pipe(
         Layer.provideMerge(McpServer.McpServer.layer),
@@ -165,6 +181,33 @@ it.effect("ato_project describes the workspace project from ato.yaml", () =>
           },
         ],
       });
+    }),
+  ),
+);
+
+it.effect("ato_validate compiles the build entry files without building", () =>
+  withProject((server, root, runs) =>
+    Effect.gen(function* () {
+      const result = yield* server.callTool({ name: "ato_validate", arguments: {} });
+      expect(result.isError).toBe(false);
+      expect(runs).toHaveLength(1);
+      expect(runs[0]!.cwd).toBe(root);
+      expect(runs[0]!.args).toEqual(["validate", "main.ato"]);
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        exitCode: 0,
+        command: ["ato"],
+        projectDir: root,
+        files: [{ path: "main.ato", ok: true }],
+        diagnostics: [],
+      });
+      const escaping = yield* server.callTool({
+        name: "ato_validate",
+        arguments: { files: ["../outside.ato"] },
+      });
+      expect(escaping.isError).toBe(true);
+      expect(contentText(escaping.content)).toContain("outside the project directory");
+      expect(runs).toHaveLength(1);
     }),
   ),
 );

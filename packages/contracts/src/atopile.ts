@@ -184,6 +184,43 @@ export const AtopileProjectInfo = Schema.Struct({
 });
 export type AtopileProjectInfo = typeof AtopileProjectInfo.Type;
 
+// --- ato_validate (compile without building) -------------------------------
+
+const VALIDATE_FILES_DESCRIPTION =
+  "`.ato` files to compile, relative to the project directory. Omit to validate the entry file of every build in ato.yaml.";
+
+export const AtopileValidateInput = Schema.Struct({
+  projectDir: Schema.optional(
+    Schema.String.annotate({ description: PROJECT_DIR_DESCRIPTION }),
+  ).annotate({ description: PROJECT_DIR_DESCRIPTION }),
+  files: Schema.optional(
+    Schema.Array(TrimmedNonEmptyString).annotate({ description: VALIDATE_FILES_DESCRIPTION }),
+  ).annotate({ description: VALIDATE_FILES_DESCRIPTION }),
+});
+export type AtopileValidateInput = typeof AtopileValidateInput.Type;
+
+export const AtopileValidateFile = Schema.Struct({
+  /** Path relative to the project directory, as passed to `ato validate`. */
+  path: Schema.String,
+  ok: Schema.Boolean,
+});
+export type AtopileValidateFile = typeof AtopileValidateFile.Type;
+
+export const AtopileValidateResult = Schema.Struct({
+  /** Exit 0 and no diagnostics. */
+  ok: Schema.Boolean,
+  exitCode: Schema.Number,
+  durationMs: Schema.Number,
+  command: Schema.Array(Schema.String),
+  projectDir: Schema.String,
+  files: Schema.Array(AtopileValidateFile),
+  /** Compile errors, with `file:line` where atopile reports one. */
+  diagnostics: Schema.Array(AtopileDiagnostic),
+});
+export type AtopileValidateResult = typeof AtopileValidateResult.Type;
+
+// --- end ato_validate --------------------------------------------------------
+
 /** One BOM line as atopile's `<build>.bom.json` records it, with designators merged. */
 export const AtopileBomLine = Schema.Struct({
   designators: Schema.Array(Schema.String),
@@ -202,16 +239,23 @@ export const AtopileBomLine = Schema.Struct({
 });
 export type AtopileBomLine = typeof AtopileBomLine.Type;
 
-/** One solved parameter from `<build>.variables.json`, flattened with its module path. */
+/**
+ * One solved parameter from `<build>.variables.json`, flattened with its module
+ * path. `margin` is the server's design-margin ratio (see `computeMargin` in
+ * apps/server/src/atopile/atoReport.ts): positive inside spec, negative outside,
+ * null when it cannot be computed. Tolerances are kept as the report wrote them.
+ */
 export const AtopileVariableRow = Schema.Struct({
   path: Schema.String,
   typeName: Schema.String,
   name: Schema.String,
   spec: Schema.NullOr(Schema.String),
+  specTolerance: Schema.optionalKey(Schema.String),
   actual: Schema.NullOr(Schema.String),
+  actualTolerance: Schema.optionalKey(Schema.String),
   unit: Schema.NullOr(Schema.String),
   source: Schema.NullOr(Schema.String),
-  meetsSpec: Schema.NullOr(Schema.Boolean),
+  margin: Schema.NullOr(Schema.Number),
 });
 export type AtopileVariableRow = typeof AtopileVariableRow.Type;
 

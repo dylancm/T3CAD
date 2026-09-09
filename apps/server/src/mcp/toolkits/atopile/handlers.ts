@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 
 import * as AtopileToolchain from "../../../atopile/AtopileToolchain.ts";
 import { describeAtoProject, readAtoProject, runAtoBuild } from "../../../atopile/atoBuild.ts";
+import { runAtoValidate } from "../../../atopile/atoValidate.ts";
 import * as ProjectionSnapshotQuery from "../../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { AtopileToolkit } from "./tools.ts";
@@ -73,6 +74,12 @@ const handlers = {
     Effect.gen(function* () {
       const location = yield* locateProject(input?.projectDir);
       return yield* describeAtoProject(location);
+    }),
+
+  ato_validate: (input) =>
+    Effect.gen(function* () {
+      const location = yield* locateProject(input?.projectDir);
+      return yield* runAtoValidate(location, input ?? {});
     }),
 
   ato_build: (input) =>

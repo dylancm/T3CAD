@@ -2,7 +2,7 @@
 
 atopile lets you describe a circuit in `.ato` files and compile it with `ato build`
 into a KiCad board, a bill of materials, and manufacturing outputs. T3CAD gives
-every agent provider three tools for working with atopile projects, and the KiCad
+every agent provider four tools for working with atopile projects, and the KiCad
 viewer picks up the board the build writes.
 
 ## Requirements
@@ -39,13 +39,17 @@ code blocks using atopile's own grammar. Nothing needs enabling.
 - `ato_status` reports whether the compiler is available and how it is invoked.
 - `ato_project` reads `ato.yaml` and returns the build names, entry modules, the
   board file each build writes, and the source, layout, and build directories.
+- `ato_validate` compiles `.ato` files without building: syntax, imports,
+  connections, and types in about a second, with compile errors as `file:line`.
+  It checks every build's entry file unless the agent names files.
 - `ato_build` runs `ato build` for one build or all of them, optionally with extra
   targets such as `mfg-data` or `3d-models`. It returns each stage's result,
   errors and warnings with `file:line` where atopile reports one, and the output
   files that exist afterwards. Builds run inside the project's workspace only.
 
 Prompts such as "add a pull-up on SDA and build" work without naming the tools;
-agents call `ato_build` after editing `.ato` files and fix the reported errors.
+agents validate after each edit, fix the reported errors, and build before
+reporting back.
 
 ## Skills
 
@@ -55,8 +59,8 @@ alongside the KiStack electronics skills:
 - `ato-language` carries atopile's own language rules and syntax reference for
   writing and reviewing `.ato` files.
 - `atopile-t3cad` explains how to build and iterate inside T3CAD: check the
-  toolchain, read `ato.yaml`, build after every edit, fix the reported
-  diagnostics, and point you to the viewer's Design tab.
+  toolchain, read `ato.yaml`, validate after every edit, build before finishing,
+  fix the reported diagnostics, and point you to the viewer's Design tab.
 
 Agents read them when a workspace holds an `ato.yaml`. They do not appear in the
 `$` skill picker, which lists only skills the provider itself discovers.

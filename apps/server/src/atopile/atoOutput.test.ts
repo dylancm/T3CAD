@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseAtoBuildOutput, stripAnsi } from "./atoOutput.ts";
+import { parseAtoBuildOutput, parseAtoValidateOutput, stripAnsi } from "./atoOutput.ts";
 
 // Trimmed from real `ato build` output (atopile 0.14.1004+76, 2026-09-08).
 const SUCCESS = `
@@ -130,7 +130,114 @@ describe("parseAtoBuildOutput", () => {
     expect(parseAtoBuildOutput(SUCCESS, 1).ok).toBe(false);
   });
 
+  it("reads the line, not the column, from a Source: path:line:column location", () => {
+    const output = `
+Syntax Error
+mismatched input '(' expecting {';', NEWLINE}
+Code causing the error:
+Source: /home/dylan/phase0/main.ato:32:24
+╭─ Build Summary ──────────────────────────────────────╮
+│ ✗ phase0:default  [fad8809e4e070435]                 │
+│ Errors (1):                                          │
+│   • mismatched input '(' expecting {';', NEWLINE}    │
+╰──────────────────────────────────────────────────────╯
+`;
+    expect(parseAtoBuildOutput(output, 1).errors).toEqual([
+      {
+        message: "mismatched input '(' expecting {';', NEWLINE}",
+        file: "/home/dylan/phase0/main.ato",
+        line: 32,
+      },
+    ]);
+  });
+
   it("strips ANSI colour codes", () => {
     expect(stripAnsi("[32m✓[0m bom")).toBe("✓ bom");
+  });
+});
+
+// Shape of `ato validate a.ato b.ato`: `<path>: ok` on stdout per passing
+// file, the same detail blocks as `ato build` on stderr per failing one.
+const VALIDATE_PASS = `
+main.ato: ok
+boards/extra.ato: ok
+`;
+
+const VALIDATE_FAIL = `
+13:02:11.001  W  …ile.cli.configure  Couldn't enable plugin api: KeyErrorNotFound()
+boards/extra.ato: ok
+Syntax Error
+mismatched input '(' expecting {';', NEWLINE}
+Code causing the error:
+Source: /home/dylan/phase0/main.ato:32:24
+  31 │   assert led.diode.forward_voltage within 1.6V to 2.4V
+❱ 32 │   r_led = new Resistor(
+Exception
+Field \`power_3v3.nonexistent_pin\` could not be resolved
+
+Code causing the error:
+  File "/home/dylan/phase0/main.ato", line 38
+  37     power_3v3.hv ~> r_led ~> led.diode.anode
+❱ 38     led.diode.cathode ~ power_3v3.nonexistent_pin
+`;
+
+describe("parseAtoValidateOutput", () => {
+  const files = ["main.ato", "boards/extra.ato"];
+
+  it("marks every echoed file ok on a clean exit", () => {
+    expect(parseAtoValidateOutput(VALIDATE_PASS, 0, files)).toEqual({
+      ok: true,
+      files: [
+        { path: "main.ato", ok: true },
+        { path: "boards/extra.ato", ok: true },
+      ],
+      diagnostics: [],
+    });
+  });
+
+  it("keeps the passing file ok and lists the failing file's diagnostics in order", () => {
+    const result = parseAtoValidateOutput(VALIDATE_FAIL, 1, files);
+    expect(result.ok).toBe(false);
+    expect(result.files).toEqual([
+      { path: "main.ato", ok: false },
+      { path: "boards/extra.ato", ok: true },
+    ]);
+    expect(result.diagnostics).toEqual([
+      {
+        message: "mismatched input '(' expecting {';', NEWLINE}",
+        file: "/home/dylan/phase0/main.ato",
+        line: 32,
+      },
+      {
+        message: "Field `power_3v3.nonexistent_pin` could not be resolved",
+        file: "/home/dylan/phase0/main.ato",
+        line: 38,
+      },
+    ]);
+  });
+
+  it("matches ok lines whether the CLI echoes the path as given or resolved", () => {
+    const output = "./main.ato: ok\n/abs/proj/boards/extra.ato: ok\n";
+    expect(parseAtoValidateOutput(output, 0, files).files.every((f) => f.ok)).toBe(true);
+  });
+
+  it("is not ok on a clean exit with a diagnostic, nor on a failing exit without one", () => {
+    expect(parseAtoValidateOutput(VALIDATE_FAIL, 0, files).ok).toBe(false);
+    const crash = parseAtoValidateOutput(
+      "ImportError: cannot import name 'front_end' from 'atopile.compiler'\n",
+      1,
+      files,
+    );
+    expect(crash.ok).toBe(false);
+    expect(crash.files).toEqual([
+      { path: "main.ato", ok: false },
+      { path: "boards/extra.ato", ok: false },
+    ]);
+    expect(crash.diagnostics).toEqual([
+      { message: "ImportError: cannot import name 'front_end' from 'atopile.compiler'" },
+    ]);
+    expect(parseAtoValidateOutput("", 2, files).diagnostics).toEqual([
+      { message: "ato validate exited with code 2" },
+    ]);
   });
 });

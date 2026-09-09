@@ -1,6 +1,6 @@
 ---
 name: atopile-t3cad
-description: "Use when a workspace contains ato.yaml: how to build, inspect and iterate on atopile projects inside T3CAD with the ato_status, ato_project and ato_build tools and the KiCad viewer's Design tab."
+description: "Use when a workspace contains ato.yaml: how to validate, build, inspect and iterate on atopile projects inside T3CAD with the ato_status, ato_project, ato_validate and ato_build tools and the KiCad viewer's Design tab."
 ---
 
 # atopile projects in T3CAD
@@ -8,7 +8,7 @@ description: "Use when a workspace contains ato.yaml: how to build, inspect and 
 A workspace with an `ato.yaml` at its root is an atopile project. The `.ato`
 files are the source of truth: describe the circuit there, then compile with
 `ato build` to regenerate the KiCad board, the bill of materials and the
-manufacturing outputs. T3CAD exposes the compiler through three tools; use them
+manufacturing outputs. T3CAD exposes the compiler through four tools; use them
 instead of running `ato` in a shell.
 
 ## Rules
@@ -18,8 +18,9 @@ instead of running `ato` in a shell.
   build. Only component positions survive between builds.
 - Do not install, upgrade or configure atopile yourself. If `ato_status` reports
   the toolchain is missing, relay its error to the user and stop.
-- Build after every change. Do not report a change as done until `ato_build`
-  succeeds for the affected build.
+- Validate after every edit with `ato_validate`; it compiles in about a second.
+  Do not report a change as done until `ato_build` succeeds for the affected
+  build.
 
 ## Workflow
 
@@ -31,19 +32,27 @@ instead of running `ato` in a shell.
    module (`file.ato:Module`), where each build writes its `.kicad_pcb`, and
    the source, layout and build directories. Use the build names it returns
    when calling `ato_build`; do not guess them.
-3. Edit the `.ato` sources. Follow the `ato-language` skill for syntax and
-   semantics.
+3. Edit the `.ato` sources (follow the `ato-language` skill for syntax and
+   semantics), then call `ato_validate`. It compiles the files without picking
+   parts or touching the board and returns each file's pass/fail plus compile
+   errors with `file:line`. Omit `files` to check every build's entry file, or
+   pass the files you edited. Fix every compile error and validate again until
+   it passes; only then call `ato_build`.
 4. Call `ato_build` with the relevant `build` name (omit it to build all). It
    returns per-stage results, errors and warnings with `file:line` where atopile
    reports one, and the artifacts that exist afterwards. Part picking may
    contact a parts service, so allow a few minutes.
-5. Fix every reported error at the given `file:line`, rebuild, and repeat until
-   the build passes. Treat warnings as worth reading, not as blockers.
+5. Fix every reported error at the given `file:line`, validate, rebuild, and
+   repeat until the build passes. Treat warnings as worth reading, not as
+   blockers.
 6. Pass extra `targets` when the user needs more than the board: `mfg-data`
    produces gerbers, pick-and-place and BOM exports; `3d-models` produces the
    3D model of the assembled board.
 
-## Fixing build errors
+## Fixing compile and build errors
+
+`ato_validate` catches the first two kinds; the picker and solver only run in
+`ato_build`.
 
 - Syntax error: the parser names the file and line. Check indentation, colons
   after block headers, and that experimental syntax (`~>`, `for`, `trait`,

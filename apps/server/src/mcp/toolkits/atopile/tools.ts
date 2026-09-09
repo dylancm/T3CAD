@@ -5,6 +5,8 @@ import {
   AtopileProjectInfo,
   AtopileProjectInput,
   AtopileToolchainStatus,
+  AtopileValidateInput,
+  AtopileValidateResult,
 } from "@t3tools/contracts";
 import * as FileSystem from "effect/FileSystem";
 import { Tool, Toolkit } from "effect/unstable/ai";
@@ -47,6 +49,20 @@ export const AtoProjectTool = Tool.make("ato_project", {
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, false);
 
+export const AtoValidateTool = Tool.make("ato_validate", {
+  description:
+    "Compile .ato files without building: syntax, imports, connections and types in under a second. Run after every edit and before ato_build. Defaults to every build's entry file from ato.yaml; returns per-file pass/fail and compile errors with file:line.",
+  parameters: AtopileValidateInput,
+  success: AtopileValidateResult,
+  failure: AtopileError,
+  dependencies,
+})
+  .annotate(Tool.Title, "Validate atopile sources")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(Tool.OpenWorld, false);
+
 export const AtoBuildTool = Tool.make("ato_build", {
   description:
     "Compile an atopile project with `ato build`: resolves the design, picks parts, updates the KiCad board and BOM. Returns per-stage results, structured errors and warnings with file:line where known, and the artifacts that now exist. Run it after every .ato change and fix reported errors before reporting back. Part picking may contact a parts service, so this can take up to a few minutes.",
@@ -61,4 +77,9 @@ export const AtoBuildTool = Tool.make("ato_build", {
   .annotate(Tool.Idempotent, false)
   .annotate(Tool.OpenWorld, true);
 
-export const AtopileToolkit = Toolkit.make(AtoStatusTool, AtoProjectTool, AtoBuildTool);
+export const AtopileToolkit = Toolkit.make(
+  AtoStatusTool,
+  AtoProjectTool,
+  AtoValidateTool,
+  AtoBuildTool,
+);

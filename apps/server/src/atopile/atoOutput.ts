@@ -15,7 +15,9 @@ const HEADER_RE = /^(✓|✗)\s+(.+?)\s+\[[0-9a-f]+\]$/;
 const SECTION_RE = /^(Stages|Errors|Warnings)(?:\s*\(\d+\))?:$/;
 const TOTAL_RE = /^Total:\s+(\d+(?:\.\d+)?)s$/;
 const FILE_LINE_RE = /File "(.+?)", line (\d+)/;
-const SOURCE_RE = /^Source:\s+(.+?):(\d+)$/;
+// `Source: <path>:<line>` or, for syntax errors, `<path>:<line>:<column>`.
+const SOURCE_RE = /^Source:\s+(.+?):(\d+)(?::\d+)?$/;
+const VALIDATE_OK_RE = /^(.+\.ato): ok$/;
 
 export interface AtoStage {
   readonly name: string;
@@ -43,6 +45,17 @@ export interface AtoBuildOutput {
   readonly targets: readonly AtoBuildTarget[];
   readonly errors: readonly AtoDiagnostic[];
   readonly warnings: readonly AtoDiagnostic[];
+}
+
+export interface AtoValidateFile {
+  readonly path: string;
+  readonly ok: boolean;
+}
+
+export interface AtoValidateOutput {
+  readonly ok: boolean;
+  readonly files: readonly AtoValidateFile[];
+  readonly diagnostics: readonly AtoDiagnostic[];
 }
 
 export function stripAnsi(text: string): string {
@@ -140,10 +153,6 @@ function parseBox(inner: readonly string[]): AtoBuildTarget {
   return { name, ok, stages, errors, warnings, totalSeconds };
 }
 
-/**
- * Map from error message → source location, harvested from the detail blocks
- * that precede the summary box.
- */
 function unbox(line: string): string {
   return line
     .replace(/^\s*│\s?/, "")
@@ -151,8 +160,20 @@ function unbox(line: string): string {
     .trim();
 }
 
-function collectLocations(raw: readonly string[]): Map<string, { file: string; line: number }> {
-  const out = new Map<string, { file: string; line: number }>();
+interface LocatedDiagnostic {
+  readonly message: string;
+  readonly file: string;
+  readonly line: number;
+}
+
+/**
+ * Every located error in the detail blocks, in output order. A block is the
+ * exception's message followed by `Code causing the error:` and a
+ * `File "<path>", line <n>` or `Source: <path>:<n>` line; the message is the
+ * nearest preceding line that is not scaffolding.
+ */
+function collectDetailDiagnostics(raw: readonly string[]): LocatedDiagnostic[] {
+  const out: LocatedDiagnostic[] = [];
   // Detail blocks may themselves be drawn inside a Rich box (0.15.x), so look
   // at the text with any box border removed.
   const lines = raw.map(unbox);
@@ -173,9 +194,21 @@ function collectLocations(raw: readonly string[]): Map<string, { file: string; l
       ) {
         continue;
       }
-      if (!out.has(candidate)) out.set(candidate, { file: match[1]!, line: Number(match[2]) });
+      out.push({ message: candidate, file: match[1]!, line: Number(match[2]) });
       break;
     }
+  }
+  return out;
+}
+
+/**
+ * Map from error message → source location, harvested from the detail blocks
+ * that precede the summary box. The first location for a message wins.
+ */
+function collectLocations(raw: readonly string[]): Map<string, { file: string; line: number }> {
+  const out = new Map<string, { file: string; line: number }>();
+  for (const { message, file, line } of collectDetailDiagnostics(raw)) {
+    if (!out.has(message)) out.set(message, { file, line });
   }
   return out;
 }
@@ -215,16 +248,70 @@ export function parseAtoBuildOutput(output: string, exitCode: number): AtoBuildO
   const errors = targets.flatMap((t) => t.errors);
   const warnings = targets.flatMap((t) => t.warnings);
   if (targets.length === 0 && exitCode !== 0) {
-    const crash = lines
-      .toReversed()
-      .map((l) => l.trim())
-      .find((l) => /^[A-Za-z_]+(Error|Exception)\b.*:/.test(l));
     return {
       ok: false,
       targets,
-      errors: [{ message: crash ?? `ato exited with code ${exitCode}` }],
+      errors: [{ message: lastExceptionLine(lines) ?? `ato exited with code ${exitCode}` }],
       warnings,
     };
   }
   return { ok: exitCode === 0 && targets.every((t) => t.ok), targets, errors, warnings };
+}
+
+function normalizeAtoPath(path: string): string {
+  return path.trim().replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+/** `ato validate` echoes the path as given, resolved relative to its cwd; accept either spelling. */
+function samePath(a: string, b: string): boolean {
+  return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`);
+}
+
+/** Last `SomethingError: ...` line, for a CLI that failed without a located diagnostic. */
+function lastExceptionLine(lines: readonly string[]): string | undefined {
+  return lines
+    .toReversed()
+    .map((l) => l.trim())
+    .find((l) => /^[A-Za-z_]+(Error|Exception)\b.*:/.test(l));
+}
+
+/**
+ * Parse combined stdout+stderr of `ato validate <files>`.
+ *
+ * The CLI prints `<path>: ok` for each file that compiled and logs compile
+ * errors with the same detail blocks `ato build` uses. It exits 1 when any
+ * file failed and keeps going past the failure, so a run can carry several
+ * files' diagnostics. Every located diagnostic is an error; `ok` is a clean
+ * exit with none of them.
+ */
+export function parseAtoValidateOutput(
+  output: string,
+  exitCode: number,
+  requestedFiles: readonly string[],
+): AtoValidateOutput {
+  const lines = stripAnsi(output).split(/\r?\n/);
+  const passed = new Set<string>();
+  for (const raw of lines) {
+    const ok = VALIDATE_OK_RE.exec(raw.trim());
+    if (ok) passed.add(normalizeAtoPath(ok[1]!));
+  }
+  const files = requestedFiles.map((path) => {
+    const normalized = normalizeAtoPath(path);
+    return { path, ok: [...passed].some((p) => samePath(p, normalized)) };
+  });
+
+  const seen = new Set<string>();
+  const diagnostics: AtoDiagnostic[] = [];
+  for (const diagnostic of collectDetailDiagnostics(lines)) {
+    const key = `${diagnostic.file}:${diagnostic.line}:${diagnostic.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    diagnostics.push(diagnostic);
+  }
+  if (exitCode !== 0 && diagnostics.length === 0) {
+    diagnostics.push({
+      message: lastExceptionLine(lines) ?? `ato validate exited with code ${exitCode}`,
+    });
+  }
+  return { ok: exitCode === 0 && diagnostics.length === 0, files, diagnostics };
 }

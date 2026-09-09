@@ -17,7 +17,12 @@ function schemaHasDescription(schema: unknown): boolean {
 
 it("exports provider-compatible object schemas with described parameters", () => {
   const tools = Object.values(AtopileToolkit.tools);
-  expect(tools.map((tool) => tool.name).sort()).toEqual(["ato_build", "ato_project", "ato_status"]);
+  expect(tools.map((tool) => tool.name).sort()).toEqual([
+    "ato_build",
+    "ato_project",
+    "ato_status",
+    "ato_validate",
+  ]);
   for (const tool of tools) {
     const schema = Tool.getJsonSchema(tool) as {
       readonly type?: unknown;
@@ -46,5 +51,5 @@ it("marks the build tool as the only non-readonly action", () => {
     .filter((tool) => Context.get(tool.annotations, Tool.Readonly) === true)
     .map((tool) => tool.name)
     .sort();
-  expect(readonly).toEqual(["ato_project", "ato_status"]);
+  expect(readonly).toEqual(["ato_project", "ato_status", "ato_validate"]);
 });
