@@ -7,8 +7,12 @@ viewer picks up the board the build writes.
 
 ## Requirements
 
-The environment running T3CAD needs the `ato` compiler. T3CAD looks for it in this
-order and does not install anything itself:
+The environment running T3CAD needs the `ato` compiler. On a machine with nothing
+installed, **Settings → atopile → Install** downloads `uv` when it is missing and
+prepares the chosen atopile release in uv's own tool environment, without touching
+a system Python, then records the resulting command in the **ato command** setting.
+Windows is not supported, because atopile publishes no Windows wheel; use WSL or a
+remote environment there. Otherwise T3CAD looks for `ato` in this order:
 
 1. The **ato command** in **Settings → atopile**, a full command line such as
    `uv run --project /src/atopile ato` for a source checkout. It is saved per

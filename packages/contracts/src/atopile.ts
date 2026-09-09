@@ -20,6 +20,48 @@ export const AtopileToolchainStatus = Schema.Struct({
 });
 export type AtopileToolchainStatus = typeof AtopileToolchainStatus.Type;
 
+/** PyPI release the Install button and the `uv tool run` fallback use unless told otherwise. */
+export const ATOPILE_PINNED_VERSION = "0.15.8";
+
+export const AtopileInstallPhase = Schema.Literals([
+  "idle",
+  "locating-uv",
+  "downloading-uv",
+  "installing",
+  "verifying",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+export type AtopileInstallPhase = typeof AtopileInstallPhase.Type;
+
+const ByteCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+/**
+ * Progress of the one-at-a-time toolchain install a server runs. The
+ * `installing` phase warms `uv tool run` for the requested release, so most of
+ * the wall time lands there without byte counts.
+ */
+export const AtopileInstallState = Schema.Struct({
+  phase: AtopileInstallPhase,
+  /** Release requested for this (or the last) install. */
+  version: Schema.String,
+  message: Schema.optionalKey(Schema.String),
+  downloadedBytes: Schema.optionalKey(ByteCount),
+  totalBytes: Schema.optionalKey(ByteCount),
+  /** Version `ato self-check` reported once the install succeeded. */
+  installedVersion: Schema.optionalKey(Schema.String),
+  /** `uv` executable the install used, on PATH or downloaded into the state directory. */
+  uvPath: Schema.optionalKey(Schema.String),
+});
+export type AtopileInstallState = typeof AtopileInstallState.Type;
+
+export const AtopileInstallStartInput = Schema.Struct({
+  /** PyPI release to prepare. Defaults to `ATOPILE_PINNED_VERSION`. */
+  version: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(64))),
+});
+export type AtopileInstallStartInput = typeof AtopileInstallStartInput.Type;
+
 export const AtopileDiagnostic = Schema.Struct({
   message: Schema.String,
   file: Schema.optionalKey(Schema.String),

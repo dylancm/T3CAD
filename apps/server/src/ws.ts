@@ -132,6 +132,7 @@ import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import { requiredScopeForRpcMethod } from "./auth/RpcAuthorization.ts";
+import * as AtopileInstaller from "./atopile/AtopileInstaller.ts";
 import * as AtopileToolchain from "./atopile/AtopileToolchain.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
@@ -613,6 +614,7 @@ const makeWsRpcLayer = (
       const usage = yield* UsageService.UsageService;
       const relayClient = yield* RelayClient.RelayClient;
       const atopileToolchain = yield* AtopileToolchain.AtopileToolchain;
+      const atopileInstaller = yield* AtopileInstaller.AtopileInstaller;
       const authorizationError = (requiredScope: AuthEnvironmentScope) =>
         new EnvironmentAuthorizationError({
           message: `The authenticated token is missing required scope: ${requiredScope}.`,
@@ -2090,6 +2092,18 @@ const makeWsRpcLayer = (
           }),
         [WS_METHODS.atopileGetToolchainStatus]: (_input) =>
           observeRpcEffect(WS_METHODS.atopileGetToolchainStatus, atopileToolchain.status(), {
+            "rpc.aggregate": "atopile",
+          }),
+        [WS_METHODS.atopileInstallStart]: (input) =>
+          observeRpcEffect(WS_METHODS.atopileInstallStart, atopileInstaller.start(input), {
+            "rpc.aggregate": "atopile",
+          }),
+        [WS_METHODS.atopileInstallCancel]: (_input) =>
+          observeRpcEffect(WS_METHODS.atopileInstallCancel, atopileInstaller.cancel(), {
+            "rpc.aggregate": "atopile",
+          }),
+        [WS_METHODS.atopileInstallSubscribe]: (_input) =>
+          observeRpcStream(WS_METHODS.atopileInstallSubscribe, atopileInstaller.changes, {
             "rpc.aggregate": "atopile",
           }),
         [WS_METHODS.cloudGetRelayClientStatus]: (_input) =>

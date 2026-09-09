@@ -13,7 +13,11 @@ import {
 } from "./providerSetup.ts";
 
 import { ExternalLauncherError, LaunchEditorInput } from "./editor.ts";
-import { AtopileToolchainStatus } from "./atopile.ts";
+import {
+  AtopileInstallStartInput,
+  AtopileInstallState,
+  AtopileToolchainStatus,
+} from "./atopile.ts";
 import {
   AuthAccessStreamError,
   AuthAccessStreamEvent,
@@ -338,6 +342,9 @@ export const WS_METHODS = {
 
   // atopile toolchain methods
   atopileGetToolchainStatus: "atopile.getToolchainStatus",
+  atopileInstallStart: "atopile.install.start",
+  atopileInstallCancel: "atopile.install.cancel",
+  atopileInstallSubscribe: "atopile.install.subscribe",
 
   // Cloud environment methods
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
@@ -519,6 +526,27 @@ const WsAtopileGetToolchainStatusRpc = Rpc.make(WS_METHODS.atopileGetToolchainSt
   payload: Schema.Struct({}),
   success: AtopileToolchainStatus,
   error: EnvironmentAuthorizationError,
+});
+
+// Install outcomes (unsupported platform, failed warm-up) travel in the state's
+// `phase` and `message`, so these too fail only on authorization.
+const WsAtopileInstallStartRpc = Rpc.make(WS_METHODS.atopileInstallStart, {
+  payload: AtopileInstallStartInput,
+  success: AtopileInstallState,
+  error: EnvironmentAuthorizationError,
+});
+
+const WsAtopileInstallCancelRpc = Rpc.make(WS_METHODS.atopileInstallCancel, {
+  payload: Schema.Struct({}),
+  success: AtopileInstallState,
+  error: EnvironmentAuthorizationError,
+});
+
+const WsAtopileInstallSubscribeRpc = Rpc.make(WS_METHODS.atopileInstallSubscribe, {
+  payload: Schema.Struct({}),
+  success: AtopileInstallState,
+  error: EnvironmentAuthorizationError,
+  stream: true,
 });
 
 const WsServerGetSettingsRpc = Rpc.make(WS_METHODS.serverGetSettings, {
@@ -1227,6 +1255,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerReportHostPowerStateRpc,
   WsServerGetBackgroundPolicyRpc,
   WsAtopileGetToolchainStatusRpc,
+  WsAtopileInstallStartRpc,
+  WsAtopileInstallCancelRpc,
+  WsAtopileInstallSubscribeRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,
   WsPullRequestsListRpc,

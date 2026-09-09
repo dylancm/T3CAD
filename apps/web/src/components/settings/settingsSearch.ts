@@ -414,6 +414,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ato", "atopile", "toolchain", "kicad"],
   },
   {
+    id: "atopile-install",
+    title: "Install atopile",
+    to: "/settings/atopile",
+    searchTerms: ["install", "atopile", "uv", "download", "toolchain", "ato", "python"],
+  },
+  {
     id: "atopile-configuration",
     title: "atopile configuration",
     to: "/settings/atopile",

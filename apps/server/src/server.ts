@@ -65,6 +65,7 @@ import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
 import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
+import * as AtopileInstaller from "./atopile/AtopileInstaller.ts";
 import * as AtopileToolchain from "./atopile/AtopileToolchain.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
@@ -297,6 +298,7 @@ const ReactorLayerLive = Layer.empty.pipe(
   // the served router's runtime, so the toolchain must live here rather than be
   // provided onto the routes layer, which only satisfies the types.
   Layer.provideMerge(AtopileToolchain.layer.pipe(Layer.provide(ProcessRunner.layer))),
+  Layer.provideMerge(AtopileInstaller.layer.pipe(Layer.provide(ProcessRunner.layer))),
   Layer.provideMerge(RuntimeReceiptBusLive),
 );
 

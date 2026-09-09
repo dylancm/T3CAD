@@ -114,6 +114,7 @@ const SETTINGS_PAGE_SECTIONS: Partial<
   ],
   "/settings/atopile": [
     { label: "Toolchain", targetId: "atopile-toolchain" },
+    { label: "Install", targetId: "atopile-install" },
     { label: "Configuration", targetId: "atopile-configuration" },
   ],
   "/settings/source-control": [

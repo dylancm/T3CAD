@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  ATOPILE_INSTALL_PHASE_LABELS,
   ATOPILE_TOOLCHAIN_SOURCE_LABELS,
   formatAtopileCommand,
+  formatAtopileInstallProgress,
+  isAtopileInstallRunning,
   formatAtopileToolchainSource,
   formatAtopileToolchainStatusLabel,
 } from "./atopileToolchain";
@@ -53,5 +56,55 @@ describe("formatAtopileCommand", () => {
 
   it("is empty when the toolchain was not found", () => {
     expect(formatAtopileCommand([])).toBeNull();
+  });
+});
+
+describe("formatAtopileInstallProgress", () => {
+  it("is empty before the first install", () => {
+    expect(formatAtopileInstallProgress({ phase: "idle" })).toBeNull();
+  });
+
+  it("shows byte progress while uv downloads, with or without a known total", () => {
+    expect(
+      formatAtopileInstallProgress({
+        phase: "downloading-uv",
+        message: "Downloading uv 0.9.9.",
+        downloadedBytes: 12_345_678,
+        totalBytes: 40_000_000,
+      }),
+    ).toBe("Downloading uv: 12.3 MB of 40.0 MB");
+    expect(formatAtopileInstallProgress({ phase: "downloading-uv" })).toBe(
+      "Downloading uv: 0.0 MB",
+    );
+  });
+
+  it("pairs the phase label with the server's message elsewhere", () => {
+    expect(
+      formatAtopileInstallProgress({ phase: "installing", message: "Preparing atopile 0.15.8." }),
+    ).toBe("Preparing atopile: Preparing atopile 0.15.8.");
+    expect(formatAtopileInstallProgress({ phase: "failed", message: "uv exited with 1" })).toBe(
+      "Failed: uv exited with 1",
+    );
+    expect(formatAtopileInstallProgress({ phase: "verifying" })).toBe("Verifying");
+  });
+
+  it("labels every phase the contract allows and knows which ones are in flight", () => {
+    const phases = Object.keys(ATOPILE_INSTALL_PHASE_LABELS).toSorted();
+    expect(phases).toEqual([
+      "cancelled",
+      "downloading-uv",
+      "failed",
+      "idle",
+      "installing",
+      "locating-uv",
+      "succeeded",
+      "verifying",
+    ]);
+    expect(phases.filter((phase) => isAtopileInstallRunning(phase as never))).toEqual([
+      "downloading-uv",
+      "installing",
+      "locating-uv",
+      "verifying",
+    ]);
   });
 });

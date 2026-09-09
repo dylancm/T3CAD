@@ -5,6 +5,7 @@ import * as NodeCrypto from "node:crypto";
 import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 
 import {
+  ATOPILE_PINNED_VERSION,
   AtopileToolchainUnavailableError,
   AuthAccessTokenType,
   AuthStandardClientScopes,
@@ -96,6 +97,7 @@ const decodeTransferShellSnapshot = Schema.decodeUnknownEffect(
 );
 const encodeTestJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
+import * as AtopileInstaller from "./atopile/AtopileInstaller.ts";
 import * as AtopileToolchain from "./atopile/AtopileToolchain.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
 import * as ServerConfig from "./config.ts";
@@ -208,6 +210,8 @@ import {
   transferBudgetViolations,
 } from "../integration/TransferBudgetReport.integration.ts";
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+
+const idleAtopileInstall = { phase: "idle", version: ATOPILE_PINNED_VERSION } as const;
 
 const defaultProjectId = ProjectId.make("project-default");
 const defaultThreadId = ThreadId.make("thread-default");
@@ -756,6 +760,15 @@ const buildAppUnderTest = (options?: {
               status: () => Effect.succeed({ available: false, command: [] }),
               run: () =>
                 Effect.fail(new AtopileToolchainUnavailableError({ detail: "no `ato` in tests" })),
+            }),
+          ),
+          Layer.succeed(
+            AtopileInstaller.AtopileInstaller,
+            AtopileInstaller.AtopileInstaller.of({
+              start: () => Effect.succeed(idleAtopileInstall),
+              cancel: () => Effect.succeed(idleAtopileInstall),
+              state: Effect.succeed(idleAtopileInstall),
+              changes: Stream.empty,
             }),
           ),
           Layer.mock(Keybindings.Keybindings)({

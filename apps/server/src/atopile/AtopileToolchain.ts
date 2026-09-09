@@ -9,12 +9,13 @@
  * 4. `uv` on PATH, running the pinned PyPI release through `uv tool run`.
  *
  * Settings are read on every resolution rather than at layer construction so
- * an edit applies to the next build without a restart. Nothing is installed
- * on the user's behalf; a missing toolchain surfaces as a typed error the
- * agent can explain.
+ * an edit applies to the next build without a restart. A missing toolchain
+ * surfaces as a typed error the agent can explain; `AtopileInstaller` is the
+ * only thing that installs, and it does so by writing the setting in step 1.
  */
 
 import {
+  ATOPILE_PINNED_VERSION,
   AtopileExecutionError,
   type AtopileSettings,
   type AtopileToolchainSource,
@@ -37,17 +38,16 @@ import { ServerSettingsService } from "../serverSettings.ts";
 export const ATO_COMMAND_ENV = "T3CAD_ATO_COMMAND";
 /** atopile's own knob for where it writes its SQLite build logs. */
 export const ATO_LOG_DIR_ENV = "FBRK_LOG_DIR";
-export const ATOPILE_PINNED_RELEASE = "atopile==0.15.8";
-export const UV_FALLBACK_COMMAND: ReadonlyArray<string> = [
-  "uv",
-  "tool",
-  "run",
-  "-p",
-  "3.14",
-  "--from",
-  ATOPILE_PINNED_RELEASE,
-  "ato",
-];
+export const ATOPILE_PINNED_RELEASE = `atopile==${ATOPILE_PINNED_VERSION}`;
+/** Python line atopile's own extension asks uv for; wheels exist for it on every supported OS. */
+export const UV_TOOL_PYTHON = "3.14";
+
+/** argv that runs `ato` from a PyPI release through `uv tool run`, warming its environment on first use. */
+export function uvToolRunCommand(uv: string, version: string): ReadonlyArray<string> {
+  return [uv, "tool", "run", "-p", UV_TOOL_PYTHON, "--from", `atopile==${version}`, "ato"];
+}
+
+export const UV_FALLBACK_COMMAND = uvToolRunCommand("uv", ATOPILE_PINNED_VERSION);
 
 const PROBE_TIMEOUT = Duration.seconds(30);
 const DEFAULT_RUN_TIMEOUT_MS = 600_000;
@@ -82,6 +82,15 @@ export function splitCommandLine(text: string): string[] {
   }
   if (hasToken) out.push(current);
   return out;
+}
+
+/**
+ * Inverse of `splitCommandLine` for one token: quotes it when whitespace or a
+ * quote would otherwise split or swallow part of it.
+ */
+export function quoteCommandArg(arg: string): string {
+  if (!/[\s"']/.test(arg)) return arg;
+  return arg.includes('"') && !arg.includes("'") ? `'${arg}'` : `"${arg.replaceAll('"', "")}"`;
 }
 
 /** First `major.minor…` token in `ato self-check` output. */

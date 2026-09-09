@@ -1026,6 +1026,23 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.atopileGetToolchainStatus,
       staleTimeMs: 5 * 60_000,
     }),
+    atopileInstallState: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:atopile:install-state",
+      tag: WS_METHODS.atopileInstallSubscribe,
+      idleTtlMs: 0,
+    }),
+    startAtopileInstall: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:atopile:install-start",
+      tag: WS_METHODS.atopileInstallStart,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId }) => environmentId,
+      },
+    }),
+    cancelAtopileInstall: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:atopile:install-cancel",
+      tag: WS_METHODS.atopileInstallCancel,
+    }),
     hostResources: createEnvironmentQueryAtomFamily(runtime, {
       label: "environment-data:server:host-resources",
       staleTimeMs: 5_000,

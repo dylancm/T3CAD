@@ -1,19 +1,27 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@t3tools/client-runtime/state/runtime";
+import { ATOPILE_PINNED_VERSION } from "@t3tools/contracts";
 import { AlertTriangleIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { usePrimarySettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import { usePrimaryEnvironment } from "../../state/environments";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
 import {
   formatAtopileCommand,
+  formatAtopileInstallProgress,
   formatAtopileToolchainSource,
   formatAtopileToolchainStatusLabel,
+  isAtopileInstallRunning,
 } from "./atopileToolchain";
 import {
   SettingResetButton,
@@ -24,7 +32,10 @@ import {
 import { searchableSetting } from "./settingsSearch";
 
 const TOOLCHAIN_DESCRIPTION =
-  "T3CAD uses the ato command below when set, then the T3CAD_ATO_COMMAND environment variable, then ato on PATH, then uv to run the pinned atopile release. T3CAD does not install atopile yet.";
+  "T3CAD uses the ato command below when set, then the T3CAD_ATO_COMMAND environment variable, then ato on PATH, then uv to run the pinned atopile release. Nothing installed? Use Install below.";
+
+const INSTALL_DESCRIPTION =
+  "Downloads uv if needed and prepares the chosen atopile release in an isolated tool environment, then sets the ato command below.";
 
 const CONFIGURATION_DESCRIPTION =
   "Saved on this server. Other machines keep their own toolchain settings.";
@@ -54,6 +65,38 @@ export function AtopileSettingsPanel() {
 
   const atopile = usePrimarySettings((settings) => settings.atopile);
   const updateSettings = useUpdatePrimarySettings();
+
+  const install = useEnvironmentQuery(
+    environmentId === null
+      ? null
+      : serverEnvironment.atopileInstallState({ environmentId, input: {} }),
+  ).data;
+  const installRunning = install !== null && isAtopileInstallRunning(install.phase);
+  const commandOptions = { reportFailure: false, reportDefect: false };
+  const startInstall = useAtomCommand(serverEnvironment.startAtopileInstall, commandOptions);
+  const cancelInstall = useAtomCommand(serverEnvironment.cancelAtopileInstall, commandOptions);
+  const [versionDraft, setVersionDraft] = useState(ATOPILE_PINNED_VERSION);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const installVersion = versionDraft.trim() || ATOPILE_PINNED_VERSION;
+  const installProgress = install === null ? null : formatAtopileInstallProgress(install);
+  // The install writes the ato command setting, which the effect below already
+  // re-probes on; this covers a reinstall of the same version, where the setting
+  // does not change but the tool environment did.
+  const installPhaseSeen = useRef(install?.phase);
+  useEffect(() => {
+    const previous = installPhaseSeen.current;
+    installPhaseSeen.current = install?.phase;
+    if (install?.phase === "succeeded" && previous !== "succeeded") refresh();
+  }, [install?.phase, refresh]);
+
+  async function runInstallCommand(request: () => ReturnType<typeof startInstall>) {
+    setInstallError(null);
+    const result = await request();
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      const failure = squashAtomCommandFailure(result);
+      setInstallError(failure instanceof Error ? failure.message : "The install request failed.");
+    }
+  }
   // The server echoes settings only after it has written them, so re-probing on
   // that echo (not on the edit) shows the Source row what the next build sees.
   const probedFor = useRef(atopile);
@@ -162,6 +205,85 @@ export function AtopileSettingsPanel() {
             />
           </>
         )}
+      </SettingsSection>
+
+      <SettingsSection
+        id={searchableSetting("atopile-install").id}
+        title="Install"
+        description={INSTALL_DESCRIPTION}
+      >
+        <SettingsRow
+          serverScoped
+          title="atopile version"
+          description="PyPI release to prepare. Match the project's requires-atopile when it has one."
+          control={
+            <DraftInput
+              size="sm"
+              className="w-full font-mono sm:w-40"
+              value={versionDraft}
+              onCommit={setVersionDraft}
+              disabled={installRunning}
+              placeholder={ATOPILE_PINNED_VERSION}
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="atopile version to install"
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          title="Install"
+          description="Runs uv tool run once so the first build does not wait on downloads. Nothing outside uv's own cache and the T3CAD state directory is touched."
+          status={
+            installError ? (
+              <span className="flex items-start gap-1.5 text-destructive-foreground">
+                <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                <span className="[overflow-wrap:anywhere]">{installError}</span>
+              </span>
+            ) : installProgress !== null ? (
+              <span
+                className={
+                  install?.phase === "failed"
+                    ? "text-destructive-foreground [overflow-wrap:anywhere]"
+                    : "[overflow-wrap:anywhere]"
+                }
+              >
+                {installProgress}
+              </span>
+            ) : undefined
+          }
+          control={
+            installRunning ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void runInstallCommand(() =>
+                    cancelInstall({ environmentId: environmentId!, input: {} }),
+                  )
+                }
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                disabled={environmentId === null}
+                onClick={() =>
+                  void runInstallCommand(() =>
+                    startInstall({
+                      environmentId: environmentId!,
+                      input: { version: installVersion },
+                    }),
+                  )
+                }
+              >
+                Install atopile {installVersion}
+              </Button>
+            )
+          }
+        />
       </SettingsSection>
 
       <SettingsSection
