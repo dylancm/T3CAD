@@ -10,6 +10,7 @@ import yamlLanguage from "@shikijs/langs/yaml";
 import githubDarkDefault from "@shikijs/themes/github-dark-default";
 import githubLightDefault from "@shikijs/themes/github-light-default";
 import { getFiletypeFromFileName } from "@pierre/diffs/utils/getFiletypeFromFileName";
+import { loadAtoLanguageRegistration } from "@t3tools/client-runtime/kicad/ato-language";
 import * as Schema from "effect/Schema";
 
 import {
@@ -139,6 +140,13 @@ const languageImports: Partial<Record<string, () => Promise<unknown>>> = {
   makefile: () => import("@shikijs/langs/makefile"),
   cmake: () => import("@shikijs/langs/cmake"),
   groovy: () => import("@shikijs/langs/groovy"),
+  ato: () => loadAtoLanguageRegistration().then((registration) => ({ default: registration })),
+};
+
+// Extensions `@pierre/diffs` does not know. Web registers these through its
+// `registerCustomLanguage`; mobile resolves them here ahead of the built-in table.
+const customFileExtensions: Record<string, string> = {
+  ato: "ato",
 };
 
 const languageAliases: Record<string, string> = {
@@ -178,6 +186,7 @@ const languageAliases: Record<string, string> = {
   plain: "text",
   plaintext: "text",
   txt: "text",
+  atopile: "ato",
 };
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 let activeHighlighterEnginePromise: Promise<ReviewHighlighterEngine> | null = null;
@@ -356,6 +365,12 @@ export async function prepareReviewHighlighterLanguages(
   );
 }
 
+function detectLanguageFromPath(path: string): string {
+  const extension = /\.([^./\\]+)$/.exec(path)?.[1];
+  const custom = extension === undefined ? undefined : customFileExtensions[extension];
+  return custom ?? getFiletypeFromFileName(path);
+}
+
 function resolveLanguageAlias(language: string): string {
   const normalized = language.toLowerCase();
   return languageAliases[normalized] ?? normalized;
@@ -365,7 +380,7 @@ function resolveLoadedLanguageFromPath(
   path: string,
   languageHint: string | null = null,
 ): string | null {
-  const detectedLanguage = languageHint ?? getFiletypeFromFileName(path);
+  const detectedLanguage = languageHint ?? detectLanguageFromPath(path);
   if (!detectedLanguage) {
     return "text";
   }
@@ -426,7 +441,7 @@ async function resolveLanguageFromPath(
     return loadedLanguage;
   }
 
-  const detectedLanguage = languageHint ?? getFiletypeFromFileName(path);
+  const detectedLanguage = languageHint ?? detectLanguageFromPath(path);
   if (!detectedLanguage) {
     return "text";
   }

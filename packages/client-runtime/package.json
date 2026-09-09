@@ -103,6 +103,14 @@
       "types": "./src/state/kicad.ts",
       "default": "./src/state/kicad.ts"
     },
+    "./kicad/ato-language": {
+      "types": "./src/kicad/atoLanguage.ts",
+      "default": "./src/kicad/atoLanguage.ts"
+    },
+    "./kicad/viewer-session-renewal": {
+      "types": "./src/kicad/viewerSessionRenewal.ts",
+      "default": "./src/kicad/viewerSessionRenewal.ts"
+    },
     "./state/attachments": {
       "types": "./src/state/attachments.ts",
       "default": "./src/state/attachments.ts"

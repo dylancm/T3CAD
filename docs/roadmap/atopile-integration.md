@@ -55,8 +55,9 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   **Settings → atopile** page shows toolchain status, source, command and version
   over a new `atopile.getToolchainStatus` RPC with a Check again button. `.ato`
   files highlight everywhere shiki runs (file preview, diffs, search, chat
-  fences) via atopile's TextMate grammar registered as a custom language in
-  `apps/web/src/kicad/languages/`. `docs/internals/atopile-toolchain.md` records
+  fences) via atopile's TextMate grammar shared from
+  `packages/client-runtime/src/kicad/` (web registers it with `@pierre/diffs`,
+  mobile loads it into its own shiki highlighter). `docs/internals/atopile-toolchain.md` records
   why atopile stays an external toolchain.
 
 ## Open: T3CAD

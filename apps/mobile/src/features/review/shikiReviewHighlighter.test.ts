@@ -71,6 +71,35 @@ describe("highlightSourceFile", () => {
   });
 });
 
+describe("atopile sources", () => {
+  const source = "module App:\n    r = new Resistor\n    r.resistance = 1kohm +/- 10%";
+
+  it("highlights .ato files with the shared atopile grammar", async () => {
+    const highlighted = await highlightSourceFile({
+      path: "boards/main.ato",
+      contents: source,
+      theme: "dark",
+    });
+
+    expect(highlighted.map((tokens) => tokens.map((token) => token.content).join(""))).toEqual(
+      source.split("\n"),
+    );
+    // Plain text yields one token per line; a loaded grammar splits the keyword line.
+    expect(highlighted[0]?.length).toBeGreaterThan(1);
+    expect(highlighted.flat().some((token) => token.color !== null)).toBe(true);
+  });
+
+  it("resolves the atopile alias for snippets", async () => {
+    const highlighted = await highlightCodeSnippet({
+      code: source,
+      language: "atopile",
+      theme: "light",
+    });
+
+    expect(highlighted[0]?.length).toBeGreaterThan(1);
+  });
+});
+
 describe("highlightReviewSelectedLines", () => {
   it("adds word-alt diff emphasis for paired deletion and addition lines", async () => {
     const lines: ReviewRenderableLineRow[] = [
