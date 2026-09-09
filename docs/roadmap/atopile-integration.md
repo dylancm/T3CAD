@@ -141,8 +141,9 @@ Still open:
 
 ## Open: atopile checkout
 
-The atopile changes stay private by the maintainer's decision (2026-09-09): no
-upstream PRs, and the branches are not published beyond the private fork.
+By the maintainer's decision (2026-09-09) nothing goes to `atopile/atopile`:
+no upstream PRs or pushes. Branches may be pushed to the `dylancm/atopile`
+fork, which is public.
 
 - `fix/easyeda-user-agent` carries the EasyEDA header fix the March source
   needs for footprint downloads.
