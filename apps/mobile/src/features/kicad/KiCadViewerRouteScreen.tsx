@@ -1,6 +1,10 @@
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import { kicadState } from "../../state/kicad";
 import { EnvironmentId } from "@t3tools/contracts";
+import {
+  createKiCadViewerSessionRenewalGate,
+  isKiCadViewerSessionExpiredMessage,
+} from "@t3tools/client-runtime/kicad/viewer-session-renewal";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,6 +36,7 @@ export function KiCadViewerRouteScreen({ route }: Props) {
   const [session, setSession] = useState<{ token: string; expiresAt: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [renewalGate] = useState(createKiCadViewerSessionRenewalGate);
   const [progress, setProgress] = useState(0);
   const webViewRef = useRef<WebView>(null);
   const theme = useUniwindTheme();
@@ -50,6 +55,7 @@ export function KiCadViewerRouteScreen({ route }: Props) {
       .then((result) => {
         if (controller.signal.aborted) return;
         if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+        renewalGate.minted(result.value.token);
         setSession(result.value);
       })
       .catch((cause: unknown) => {
@@ -57,7 +63,7 @@ export function KiCadViewerRouteScreen({ route }: Props) {
           setError(cause instanceof Error ? cause.message : "Unable to open the KiCad viewer.");
       });
     return () => controller.abort();
-  }, [connection, cwd, environmentId, mintSession, refreshKey]);
+  }, [connection, cwd, environmentId, mintSession, refreshKey, renewalGate]);
 
   useEffect(() => {
     if (!session) return;
@@ -128,6 +134,22 @@ export function KiCadViewerRouteScreen({ route }: Props) {
             }
             setError("Navigation outside the KiCad viewer was blocked.");
             return false;
+          }}
+          onMessage={(event) => {
+            // The viewer reports its first 401 (sessions die with a server
+            // restart); re-mint once rather than showing the expired page.
+            let data: unknown;
+            try {
+              data = JSON.parse(event.nativeEvent.data);
+            } catch {
+              return;
+            }
+            if (
+              session &&
+              isKiCadViewerSessionExpiredMessage(data) &&
+              renewalGate.requestRenewal(session.token)
+            )
+              retry();
           }}
           onLoadProgress={(event) => setProgress(event.nativeEvent.progress)}
           onLoadStart={() => setProgress(0.05)}

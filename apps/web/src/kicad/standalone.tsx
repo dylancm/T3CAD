@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import "../index.css";
 import "./viewer.css";
+import { KICAD_VIEWER_SESSION_EXPIRED_MESSAGE } from "@t3tools/client-runtime/kicad/viewer-session-renewal";
 import type {
   AtopileBuildResult,
   AtopileReport,
@@ -77,6 +78,32 @@ const params = new URLSearchParams(location.hash.slice(1));
 const apiBase = params.get("api") || location.origin;
 const token = params.get("token") || "";
 const messageOrigin = location.origin === "null" ? "*" : location.origin;
+
+declare global {
+  interface Window {
+    /** Injected by react-native-webview; the mobile KiCad screen listens through `onMessage`. */
+    ReactNativeWebView?: { postMessage(message: string): void };
+  }
+}
+
+let sessionExpiryReported = false;
+/**
+ * Tell the embedding host the token stopped working (typically a server
+ * restart dropped its in-memory sessions) so it can mint a fresh one and
+ * reload this page. Once per page load: on success the host replaces this
+ * frame, on refusal it leaves the expired state visible, and the manifest
+ * poll keeps hitting 401 in between with nothing new to say.
+ */
+function sessionExpiredError(): Error {
+  if (!sessionExpiryReported) {
+    sessionExpiryReported = true;
+    const message = { type: KICAD_VIEWER_SESSION_EXPIRED_MESSAGE };
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- the react-native-webview bridge takes a single string.
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
+    else if (window.parent !== window) window.parent.postMessage(message, messageOrigin);
+  }
+  return new Error("Viewer access expired. Reopen the KiCad panel to reconnect.");
+}
 const normalizeProjectPath = (path: string) => path.replaceAll("\\", "/").replace(/^\.\//, "");
 function apiUrl(route: string, path?: string, revision?: string) {
   const url = new URL(`${apiBase.replace(/\/$/, "")}/api/kicad/${route}`);
@@ -88,8 +115,7 @@ function apiUrl(route: string, path?: string, revision?: string) {
 async function readResponse(url: string, signal: AbortSignal) {
   const response = await fetch(url, { signal, cache: "no-store" });
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403)
-      throw new Error("Viewer access expired. Reopen the KiCad panel to reconnect.");
+    if (response.status === 401 || response.status === 403) throw sessionExpiredError();
     throw new Error(
       (await response.text()).slice(0, 700) || `Unable to load project (${response.status})`,
     );
@@ -105,8 +131,7 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal) {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403)
-      throw new Error("Viewer access expired. Reopen the KiCad panel to reconnect.");
+    if (response.status === 401 || response.status === 403) throw sessionExpiredError();
     throw new Error((await response.text()).slice(0, 700) || `Request failed (${response.status})`);
   }
   return response;

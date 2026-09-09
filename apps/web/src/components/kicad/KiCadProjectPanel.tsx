@@ -1,4 +1,8 @@
 import type { KiCadViewerSession, ScopedThreadRef } from "@t3tools/contracts";
+import {
+  createKiCadViewerSessionRenewalGate,
+  isKiCadViewerSessionExpiredMessage,
+} from "@t3tools/client-runtime/kicad/viewer-session-renewal";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import * as Option from "effect/Option";
 import { ExternalLink, LoaderCircle } from "lucide-react";
@@ -23,6 +27,7 @@ export function KiCadProjectPanel({ mode, threadRef, projectPath }: KiCadProject
   const [session, setSession] = useState<KiCadViewerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [renewalGate] = useState(createKiCadViewerSessionRenewalGate);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const connection = usePreparedConnection(threadRef.environmentId);
   const mintSession = useAtomQueryRunner(kicadState.session, {
@@ -45,6 +50,7 @@ export function KiCadProjectPanel({ mode, threadRef, projectPath }: KiCadProject
       .then((result) => {
         if (controller.signal.aborted) return;
         if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+        renewalGate.minted(result.value.token);
         setSession(result.value);
       })
       .catch((cause: unknown) => {
@@ -52,7 +58,24 @@ export function KiCadProjectPanel({ mode, threadRef, projectPath }: KiCadProject
           setError(cause instanceof Error ? cause.message : "Unable to open the KiCad viewer.");
       });
     return () => controller.abort();
-  }, [connection, mintSession, projectPath, refreshKey, threadRef.environmentId]);
+  }, [connection, mintSession, projectPath, refreshKey, renewalGate, threadRef.environmentId]);
+
+  // Sessions live in server memory, so a restart leaves the open viewer with a
+  // dead token; it reports the first 401 and we re-mint once instead of
+  // showing the expired state until the panel is reopened.
+  useEffect(() => {
+    if (!session) return;
+    const onMessage = (event: MessageEvent) => {
+      if (
+        event.source !== iframeRef.current?.contentWindow ||
+        !isKiCadViewerSessionExpiredMessage(event.data)
+      )
+        return;
+      if (renewalGate.requestRenewal(session.token)) setRefreshKey((key) => key + 1);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [renewalGate, session]);
 
   const sendTheme = useCallback(() => {
     const frame = iframeRef.current?.contentWindow;
