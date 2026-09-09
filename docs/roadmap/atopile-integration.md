@@ -39,7 +39,7 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   (Tools menu, atopile projects only) shows the last build this server ran
   (stages, errors with `file:line`, warnings), the picked BOM with unit cost,
   stock, and library class from `<build>.bom.json`, and every solved parameter
-  against its spec from `<build>.variables.json`, out-of-spec rows highlighted.
+  against its spec from `<build>.variables.json` (now with a Margin column).
   Served by `GET /api/kicad/ato-report?build=`. Builds from `ato_build` and the
   Build button both register in an in-memory last-build record that the manifest
   summarises, so the tab refreshes after agent builds too.
@@ -82,6 +82,14 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   adds `leds`/`diodes` endpoints, pickable traits on `LED`/`Diode`, free-form
   package names for non-R/C/L parts, and `led.color = "RED"`; parts-server
   answers both endpoints; the sample project builds with no pinned parts.
+- **Ports from the 0.15.8 source** (2026-09-09) — PyPI ships a full MIT sdist
+  for every post-March release, so the newer source is public even though
+  GitHub is stale; it does not fix `ato validate` or `meetsSpec`, and it adds
+  a login gate, so the fork stays on the March base and ports fixes. Landed:
+  `atopile-easyeda2kicad>=0.9.9` replaces the header patch; `ato validate`
+  compiles files without building (fork), surfaced as the `ato_validate` tool;
+  the Design tab shows a Margin column computed from spec and actual instead of
+  the never-populated `meetsSpec`.
 
 ## Open: T3CAD
 
@@ -105,13 +113,10 @@ Decisions that stand, kept so nobody re-litigates them:
 
 Still open:
 
-- `meetsSpec` is `null` for every row in the March source's variables report,
-  so the Design tab's out-of-spec highlight is untested against real data.
 - The Design tab reads whole reports on every manifest revision; page past a
   few thousand parts if it ever matters.
-- `ato validate` crashes in the March source (`ImportError: front_end`), so
-  problems come only from build output. Surface pre-build diagnostics if a
-  working validate appears.
+- `ato_validate` exists for agents; a save-time problems view in the viewer
+  using the same command is the natural next step.
 - The installer pins `ATOPILE_PINNED_VERSION`; honour `requires-atopile` from
   the open project when it is a plain version.
 - Uppercase `.ATO` stays plain text, consistent with every other extension in
@@ -145,12 +150,14 @@ By the maintainer's decision (2026-09-09) nothing goes to `atopile/atopile`:
 no upstream PRs or pushes. Branches may be pushed to the `dylancm/atopile`
 fork, which is public.
 
-- `fix/easyeda-user-agent` carries the EasyEDA header fix the March source
-  needs for footprint downloads.
+- `fix/easyeda-user-agent` carried the EasyEDA header fix; superseded on
+  `feat/led-diode-picking` by the `atopile-easyeda2kicad>=0.9.9` pin upstream
+  used.
 - `feat/led-diode-picking` (on top of it) is what phase0 builds with; it moves
   the invalid-package error from compile time to pick time and adds
-  `has_package_requirements.package_name`. Its live picker tests need a
-  components service such as parts-server.
+  `has_package_requirements.package_name`, `led.color = "RED"`, and a working
+  `ato validate`. Its live picker tests need a components service such as
+  parts-server. The 0.15.8 sdist is the reference for further ports.
 - Version pin decision stands: March source for a login-free toolchain, 0.15.8
   wheel if an atopile account is acceptable. Both read
   `services.components.url`; 0.15.8 also demands a stored token before any
