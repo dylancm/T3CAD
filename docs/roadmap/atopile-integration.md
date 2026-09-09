@@ -141,14 +141,15 @@ Still open:
 
 ## Open: atopile checkout
 
-- Upstream the EasyEDA header fix (`fix/easyeda-user-agent`), or re-pin
-  `atopile-easyeda2kicad` to a version carrying upstream easyeda2kicad's fix.
-  The public repo has had no commits since March 2026, so a PR may sit. Opening
-  it is the maintainer's call.
-- `feat/led-diode-picking` (on top of the EasyEDA fix) is what phase0 builds
-  with; it moves the invalid-package error from compile time to pick time and
-  adds `has_package_requirements.package_name`. Upstreaming it needs the live
-  picker tests run against a components service.
+The atopile changes stay private by the maintainer's decision (2026-09-09): no
+upstream PRs, and the branches are not published beyond the private fork.
+
+- `fix/easyeda-user-agent` carries the EasyEDA header fix the March source
+  needs for footprint downloads.
+- `feat/led-diode-picking` (on top of it) is what phase0 builds with; it moves
+  the invalid-package error from compile time to pick time and adds
+  `has_package_requirements.package_name`. Its live picker tests need a
+  components service such as parts-server.
 - Version pin decision stands: March source for a login-free toolchain, 0.15.8
   wheel if an atopile account is acceptable. Both read
   `services.components.url`; 0.15.8 also demands a stored token before any
