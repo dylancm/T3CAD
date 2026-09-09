@@ -85,10 +85,14 @@ project without configuration:
 
 - A **Design** tab appears next to Schematic, PCB, 3D, Gerbers, and STEP. It
   shows the last build's outcome and diagnostics, the picked bill of materials
-  with unit costs and stock, and every solved parameter next to its spec, with
-  out-of-spec rows highlighted. It reads the `.bom.json` and `.variables.json`
+  with unit costs and stock, and every solved parameter next to its spec, with a
+  **Margin** column. It reads the `.bom.json` and `.variables.json`
   reports `ato build` writes, so it reflects builds started by agents as well as
-  by the Build button.
+  by the Build button. Margin shows how much of each spec's allowance the
+  picked part leaves unused, for example `+90%` for a 1% resistor against a
+  10% spec or `+25%` for a 62.5 mW rating against a `>= 50mW` requirement.
+  Margins under 10% are shown in amber. A dash means the value is not numeric
+  or the spec has no bound to measure against.
 
 Anyone who can open the viewer for a project can start a build of it. Builds
 only regenerate that project's own outputs. See the

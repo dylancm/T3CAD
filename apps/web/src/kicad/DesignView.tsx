@@ -1,7 +1,16 @@
 import type { AtopileReport } from "@t3tools/contracts";
 import { useEffect, useRef, useState } from "react";
 
-import { BOM_COLUMNS, bomRow, bomTotal, buildHeadline, formatBuildTime } from "./designReport";
+import {
+  BOM_COLUMNS,
+  VARIABLE_COLUMNS,
+  bomRow,
+  bomTotal,
+  buildHeadline,
+  formatBuildTime,
+  formatMargin,
+  withTolerance,
+} from "./designReport";
 
 export type DesignViewProps = {
   readonly build: string;
@@ -9,7 +18,6 @@ export type DesignViewProps = {
   readonly read: (signal: AbortSignal) => Promise<AtopileReport>;
 };
 
-const VARIABLE_COLUMNS = ["Module", "Parameter", "Spec", "Actual", "Unit", "Source"];
 const cell = "border-b border-border/60 px-3 py-1.5 align-top";
 
 /**
@@ -62,7 +70,6 @@ export function DesignView({ build, revision, read }: DesignViewProps) {
   }
   const last = report.lastBuild;
   const total = report.bom ? bomTotal(report.bom) : undefined;
-  const failing = report.variables?.filter((row) => row.meetsSpec === false) ?? [];
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
@@ -181,7 +188,6 @@ export function DesignView({ build, revision, read }: DesignViewProps) {
             <span className="text-muted-foreground">
               {report.variables.length} solved parameter
               {report.variables.length === 1 ? "" : "s"}
-              {failing.length > 0 ? ` / ${failing.length} outside spec` : ""}
             </span>
           ) : (
             <span className="text-muted-foreground">No variables report yet.</span>
@@ -207,22 +213,29 @@ export function DesignView({ build, revision, read }: DesignViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {report.variables.map((row) => (
-                  <tr
-                    key={`${row.path}.${row.name}`}
-                    className={row.meetsSpec === false ? "bg-destructive/10" : "odd:bg-muted/20"}
-                  >
-                    <td className={`${cell} font-mono`}>
-                      {row.path}
-                      <span className="text-muted-foreground"> {row.typeName}</span>
-                    </td>
-                    <td className={`${cell} font-mono`}>{row.name}</td>
-                    <td className={`${cell} font-mono`}>{row.spec ?? ""}</td>
-                    <td className={`${cell} font-mono`}>{row.actual ?? ""}</td>
-                    <td className={cell}>{row.unit ?? ""}</td>
-                    <td className={cell}>{row.source ?? ""}</td>
-                  </tr>
-                ))}
+                {report.variables.map((row) => {
+                  const margin = formatMargin(row.margin);
+                  return (
+                    <tr key={`${row.path}.${row.name}`} className="odd:bg-muted/20">
+                      <td className={`${cell} font-mono`}>
+                        {row.path}
+                        <span className="text-muted-foreground"> {row.typeName}</span>
+                      </td>
+                      <td className={`${cell} font-mono`}>{row.name}</td>
+                      <td className={`${cell} font-mono`}>
+                        {withTolerance(row.spec, row.specTolerance)}
+                      </td>
+                      <td className={`${cell} font-mono`}>
+                        {withTolerance(row.actual, row.actualTolerance)}
+                      </td>
+                      <td className={`${cell} font-mono tabular-nums ${margin.className}`}>
+                        {margin.text}
+                      </td>
+                      <td className={cell}>{row.unit ?? ""}</td>
+                      <td className={cell}>{row.source ?? ""}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

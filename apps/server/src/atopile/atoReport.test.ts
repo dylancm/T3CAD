@@ -8,8 +8,10 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import { parseAtoConfig } from "./atoProject.ts";
 import {
   clearAtoBuildHistory,
+  computeMargin,
   getLastAtoBuild,
   parseAtoBom,
+  parseAtoQuantity,
   parseAtoVariables,
   readAtoReport,
   recordAtoBuild,
@@ -47,18 +49,49 @@ const VARIABLES_JSON = `{
       "name": "c_3v3", "type": "module", "path": "c_3v3", "typeName": "Capacitor",
       "variables": [
         { "name": "capacitance", "spec": "{90..110}nF", "specTolerance": null, "actual": "{95..105}nF",
-          "actualTolerance": null, "unit": "nF", "type": "capacitance", "meetsSpec": null, "source": "picked" }
+          "actualTolerance": null, "unit": "nF", "type": "capacitance", "meetsSpec": null, "source": "picked" },
+        { "name": "max_voltage", "spec": "{≥10}V", "specTolerance": null, "actual": "50V",
+          "actualTolerance": null, "unit": "V", "type": "voltage", "meetsSpec": null, "source": "picked" }
       ],
       "children": [
         {
           "name": "power", "type": "interface", "path": "c_3v3.power", "typeName": "ElectricPower",
           "variables": [
             { "name": "voltage", "spec": "{ℝ+}V", "specTolerance": null, "actual": null,
-              "actualTolerance": null, "unit": "V", "type": "voltage", "meetsSpec": false, "source": "derived" }
+              "actualTolerance": null, "unit": "V", "type": "voltage", "meetsSpec": null, "source": "derived" }
           ],
           "children": []
         }
       ]
+    },
+    {
+      "name": "led", "type": "module", "path": "led", "typeName": "LED",
+      "variables": [
+        { "name": "color", "spec": "RED", "specTolerance": null, "actual": "RED",
+          "actualTolerance": null, "unit": null, "type": "dimensionless", "meetsSpec": null, "source": "picked" },
+        { "name": "max_brightness", "spec": "{≥0.1}cd", "specTolerance": null, "actual": "300mcd",
+          "actualTolerance": null, "unit": "cd", "type": "dimensionless", "meetsSpec": null, "source": "picked" }
+      ],
+      "children": [
+        {
+          "name": "diode", "type": "module", "path": "led.diode", "typeName": "Diode",
+          "variables": [
+            { "name": "forward_voltage", "spec": "2V", "specTolerance": "±20.0%", "actual": null,
+              "actualTolerance": null, "unit": "V", "type": "voltage", "meetsSpec": null, "source": "picked" }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "r_led", "type": "module", "path": "r_led", "typeName": "Resistor",
+      "variables": [
+        { "name": "max_power", "spec": "{≥0.05}W", "specTolerance": null, "actual": "62.5mW",
+          "actualTolerance": null, "unit": "W", "type": "power", "meetsSpec": null, "source": "picked" },
+        { "name": "resistance", "spec": "{900..1100}Ω", "specTolerance": null, "actual": "1kΩ",
+          "actualTolerance": "±1.0%", "unit": "Ω", "type": "resistance", "meetsSpec": null, "source": "picked" }
+      ],
+      "children": []
     }
   ]
 }`;
@@ -96,30 +129,108 @@ describe("parseAtoBom", () => {
 });
 
 describe("parseAtoVariables", () => {
-  it("flattens the node tree into rows with module paths", () => {
+  it("flattens the node tree into rows with module paths, tolerances and margins", () => {
     const rows = parseAtoVariables(VARIABLES_JSON);
-    expect(rows).toEqual([
-      {
-        path: "c_3v3",
-        typeName: "Capacitor",
-        name: "capacitance",
-        spec: "{90..110}nF",
-        actual: "{95..105}nF",
-        unit: "nF",
-        source: "picked",
-        meetsSpec: null,
-      },
-      {
-        path: "c_3v3.power",
-        typeName: "ElectricPower",
-        name: "voltage",
-        spec: "{ℝ+}V",
-        actual: null,
-        unit: "V",
-        source: "derived",
-        meetsSpec: false,
-      },
+    expect(rows.map((r) => [r.path, r.name, r.margin])).toEqual([
+      ["c_3v3", "capacitance", 0.5],
+      ["c_3v3", "max_voltage", 4],
+      ["c_3v3.power", "voltage", null],
+      ["led", "color", null],
+      ["led", "max_brightness", 2],
+      ["led.diode", "forward_voltage", null],
+      ["r_led", "max_power", 0.25],
+      ["r_led", "resistance", 0.9],
     ]);
+    expect(rows[7]).toEqual({
+      path: "r_led",
+      typeName: "Resistor",
+      name: "resistance",
+      spec: "{900..1100}Ω",
+      actual: "1kΩ",
+      actualTolerance: "±1.0%",
+      unit: "Ω",
+      source: "picked",
+      margin: 0.9,
+    });
+    expect(rows[5]).toMatchObject({ spec: "2V", specTolerance: "±20.0%", actual: null });
+    expect("specTolerance" in (rows[7] as object)).toBe(false);
+  });
+});
+
+describe("parseAtoQuantity", () => {
+  const q = (lo: number, hi: number, unit: string) => ({ lo, hi, unit });
+
+  it("reads every form the variable report writes, scaled to the base unit", () => {
+    expect(parseAtoQuantity("{900..1100}Ω")).toEqual(q(900, 1100, "Ω"));
+    expect(parseAtoQuantity("1kΩ", "±1.0%")).toEqual(q(990, 1010, "Ω"));
+    expect(parseAtoQuantity("1±1.0%kΩ")).toEqual(q(990, 1010, "Ω"));
+    expect(parseAtoQuantity("{≥0.05}W")).toEqual(q(0.05, Infinity, "W"));
+    expect(parseAtoQuantity("62.5mW")).toEqual(q(0.0625, 0.0625, "W"));
+    expect(parseAtoQuantity("300mcd")).toEqual(q(0.3, 0.3, "cd"));
+    expect(parseAtoQuantity("{ℝ+}V")).toEqual(q(0, Infinity, "V"));
+    expect(parseAtoQuantity("{ℝ}V")).toEqual(q(-Infinity, Infinity, "V"));
+    expect(parseAtoQuantity("2V", "±20.0%")).toEqual(q(1.6, 2.4, "V"));
+    expect(parseAtoQuantity("{95..105}nF")).toEqual({
+      lo: expect.closeTo(95e-9, 15),
+      hi: expect.closeTo(105e-9, 15),
+      unit: "F",
+    });
+  });
+
+  it("accepts looser hand-written spellings", () => {
+    expect(parseAtoQuantity("1kΩ ±10%")).toEqual(q(900, 1100, "Ω"));
+    expect(parseAtoQuantity("3.3V +/- 5%")).toEqual(q(3.135, 3.465, "V"));
+    expect(parseAtoQuantity("≥ 50mW")).toEqual(q(0.05, Infinity, "W"));
+    expect(parseAtoQuantity("<= 10V")).toEqual(q(-Infinity, 10, "V"));
+    expect(parseAtoQuantity("1.6V to 2.4V")).toEqual(q(1.6, 2.4, "V"));
+    expect(parseAtoQuantity("1V", "±0.1V")).toEqual(q(0.9, 1.1, "V"));
+    expect(parseAtoQuantity("900Ω..1.1kΩ")).toEqual(q(900, 1100, "Ω"));
+  });
+
+  it("returns null instead of guessing", () => {
+    expect(parseAtoQuantity(null)).toBeNull();
+    expect(parseAtoQuantity("")).toBeNull();
+    expect(parseAtoQuantity("RED")).toBeNull();
+    expect(parseAtoQuantity("{1, 2}V")).toBeNull();
+    expect(parseAtoQuantity("{1..2, 5..6}V")).toBeNull();
+    expect(parseAtoQuantity("{1..2}V", "±5%")).toBeNull();
+    expect(parseAtoQuantity("1V", "±abc")).toBeNull();
+    expect(parseAtoQuantity("1V", "±0.1A")).toBeNull();
+    expect(parseAtoQuantity("2V..1V")).toBeNull();
+    expect(parseAtoQuantity("{{}}")).toBeNull();
+  });
+});
+
+describe("computeMargin", () => {
+  const m = (spec: string, actual: string, actualTolerance?: string) => {
+    const s = parseAtoQuantity(spec);
+    const a = parseAtoQuantity(actual, actualTolerance);
+    if (!s || !a) throw new Error("fixture does not parse");
+    return computeMargin(s, a);
+  };
+
+  it("measures the allowance left on the tighter side of a two-sided spec", () => {
+    expect(m("{900..1100}Ω", "1kΩ", "±1.0%")).toBe(0.9);
+    expect(m("{90..110}nF", "{95..105}nF")).toBe(0.5);
+    expect(m("{90..110}nF", "{91..105}nF")).toBe(0.1);
+    expect(m("{900..1100}Ω", "1kΩ")).toBe(1);
+    expect(m("{900..1100}Ω", "1.2kΩ")).toBe(-1);
+  });
+
+  it("measures distance from a one-sided bound as a fraction of the bound", () => {
+    expect(m("{≥0.05}W", "62.5mW")).toBe(0.25);
+    expect(m("{≥0.1}cd", "300mcd")).toBe(2);
+    expect(m("{≥10}V", "50V")).toBe(4);
+    expect(m("{≤10}V", "12V")).toBe(-0.2);
+    expect(m("{≤10}V", "9V", "±1%")).toBeCloseTo(0.091, 3);
+  });
+
+  it("is null when there is nothing to measure against", () => {
+    expect(m("{ℝ+}V", "5V")).toBeNull();
+    expect(m("{ℝ}V", "5V")).toBeNull();
+    expect(m("2V", "2V")).toBeNull();
+    expect(m("{≥10}V", "50A")).toBeNull();
+    expect(m("{≥10}V", "≥50V")).toBeNull();
   });
 });
 

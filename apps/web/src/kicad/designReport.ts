@@ -1,4 +1,4 @@
-import type { AtopileBomLine, AtopileReport } from "@t3tools/contracts";
+import type { AtopileBomLine, AtopileReport, AtopileVariableRow } from "@t3tools/contracts";
 
 /** Column order for the Design tab's BOM table. */
 export const BOM_COLUMNS = [
@@ -58,4 +58,39 @@ export function buildHeadline(report: AtopileReport): string {
   return result.ok
     ? `Last build succeeded in ${(result.durationMs / 1000).toFixed(1)} s with ${n(result.warnings.length, "warning")}.`
     : `Last build failed with ${n(result.errors.length, "error")} and ${n(result.warnings.length, "warning")}.`;
+}
+
+/** Column order for the Design tab's variables table. */
+export const VARIABLE_COLUMNS = [
+  "Module",
+  "Parameter",
+  "Spec",
+  "Actual",
+  "Margin",
+  "Unit",
+  "Source",
+] as const;
+
+/** `1kΩ` plus its `±1.0%` as one cell, the way the report's markdown shows it. */
+export function withTolerance(value: string | null, tolerance: string | undefined): string {
+  if (value === null) return "";
+  return tolerance ? `${value} ${tolerance}` : value;
+}
+
+/**
+ * The Margin cell for a server-computed margin ratio: `+90%` reads as "90 % of
+ * the allowance left". Under 10 % is amber, negative (outside spec, which a
+ * successful build should never produce) is red, unknown is a muted dash.
+ */
+export function formatMargin(margin: AtopileVariableRow["margin"]): {
+  text: string;
+  className: string;
+} {
+  if (margin === null) return { text: "–", className: "text-muted-foreground" };
+  const percent = margin * 100;
+  const text =
+    percent > 999 ? ">+999%" : `${percent < 0 ? "-" : "+"}${Math.round(Math.abs(percent))}%`;
+  if (margin < 0) return { text, className: "text-destructive" };
+  if (margin < 0.1) return { text, className: "text-warning" };
+  return { text, className: "" };
 }

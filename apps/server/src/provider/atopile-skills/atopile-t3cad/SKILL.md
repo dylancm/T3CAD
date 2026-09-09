@@ -83,7 +83,8 @@ Tell the user where to look in the KiCad viewer:
 - The PCB and 3D tabs show the build's board.
 - The Design tab shows the build's outcome and diagnostics, the picked BOM with
   unit costs and stock, and every solved parameter next to its spec, with
-  out-of-spec rows highlighted. It reflects agent-run builds as well as builds
+  a Margin column showing how much of each spec's allowance the picked part
+  leaves unused. It reflects agent-run builds as well as builds
   started with the viewer's Build button.
 - Gerbers from `mfg-data` appear in the Gerber tab once the build has written
   `<build>.gerber.zip`.
