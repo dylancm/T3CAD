@@ -10,10 +10,10 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
 
 | Repo                                                | Role                                                                      | State (2026-09-08)                                       |
 | --------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `dylancm/T3CAD` (this fork, branch `t3cad`)         | Agent workspace + KiCad viewer + atopile tools                            | Phases 0–3 done, Phase 4 skipped, Phase 5 slice 1 done   |
-| `dylancm/atopile` (branch `fix/easyeda-user-agent`) | March 2026 open-source atopile, built from source                         | 1 local fix; upstream public repo stale since 2026-03-11 |
-| `dylancm/parts-server` (private)                    | Stand-in for atopile's retired components API over the jlcparts catalogue | Explicit + parametric picking working                    |
-| `dylancm/t3cad-phase0` (private)                    | Sample `.ato` project wired to T3CAD                                      | Builds with no atopile account                           |
+| `dylancm/T3CAD` (this fork, branch `t3cad`)         | Agent workspace + KiCad viewer + atopile tools                            | Phases 0–3 and 5 done, Phase 4 skipped                   |
+| `dylancm/atopile` (branch `fix/easyeda-user-agent`) | March 2026 open-source atopile, built from source                         | EasyEDA fix + LED/diode picking branches; upstream stale |
+| `dylancm/parts-server` (private)                    | Stand-in for atopile's retired components API over the jlcparts catalogue | Explicit + parametric R/C/L/LED/diode, attributes, fast  |
+| `dylancm/t3cad-phase0` (private)                    | Sample `.ato` project wired to T3CAD                                      | Builds with no atopile account, every part parametric    |
 
 ## Done
 
@@ -59,115 +59,80 @@ Original evaluation and plan: https://claude.ai/code/artifact/7816e528-6a4f-4d01
   `packages/client-runtime/src/kicad/` (web registers it with `@pierre/diffs`,
   mobile loads it into its own shiki highlighter). `docs/internals/atopile-toolchain.md` records
   why atopile stays an external toolchain.
+- **Phase 5, slices 2 and 3** (2026-09-08) — Settings → atopile gained an
+  editable `ato command` and `Log directory` (`ServerSettings.atopile`), read on
+  every resolution ahead of `T3CAD_ATO_COMMAND`, PATH and the uv fallback, with
+  `FBRK_LOG_DIR` passed to every probe and build. An Install button locates or
+  downloads `uv` into the server state directory, prepares the chosen release
+  with `uv tool run` exactly as atopile's VS Code extension does, and records the
+  resulting command in the setting (`apps/server/src/atopile/AtopileInstaller.ts`,
+  `atopile.install.*` RPCs).
+- **Smaller items closed** (2026-09-08) — route-level test for the build route
+  (`apps/server/src/kicad/kicadBuildRoute.test.ts`) and a stub toolchain in the
+  server test harness; the KiCad panel re-mints its viewer session once after a
+  server restart on web and mobile (`packages/client-runtime/src/kicad/`);
+  `.ato` highlighting on mobile with the grammar shared from client-runtime;
+  Windows documented as unsupported.
+- **parts-server backlog** (2026-09-08) — attributes on explicit lookups for
+  indexed parts; hot-value queries from ~270 ms to ~2 ms (closed range, rank
+  column, covering indexes, index `schema_version`); datasheet URLs rewritten to
+  LCSC's stable PDF form so builds no longer log "not a PDF"; `fetch-catalog
+--if-older-than` and `parts-server status`; March-source setup notes.
+- **LED and diode picking** (2026-09-08) — atopile branch `feat/led-diode-picking`
+  adds `leds`/`diodes` endpoints, pickable traits on `LED`/`Diode`, free-form
+  package names for non-R/C/L parts, and `led.color = "RED"`; parts-server
+  answers both endpoints; the sample project builds with no pinned parts.
 
 ## Open: T3CAD
 
-### Phase 2 follow-ups
+Decisions that stand, kept so nobody re-litigates them:
 
-- Builds from the viewer run synchronously and return when `ato build` exits;
-  long builds show only "Building…". Streaming through the terminal manager was
-  deferred; the MCP `ato_build` result already carries the structured output.
-- A viewer-session token (minted with read scope) can start a build. Accepted
-  because the token is bound to one directory and a build only regenerates that
-  project's outputs; revisit if viewer links are ever shared more widely.
-- Config surface decided: no new file. `.k3eda.json` keeps viewer assignments
-  and atopile defaults are derived from `ato.yaml`; an explicit assignment wins.
-- The 50,000-entry scan cap and 300 ms manifest cache were reviewed against the
-  sample project (hundreds of files); no change needed, but a project with
-  years of `build/` output could approach the cap.
-- An upstream discovery test ("changes revision when an inspected file
-  changes…") failed once in a combined run and passed on every rerun; it relies
-  on mtime ordering within the same second. Not caused by this work, worth
-  hardening if it recurs.
-- The Build button was verified through unit and in-memory tests plus a manifest
-  smoke run on the sample project; KiCad is not installed on the dev machine, so
-  the GLB and gerber paths were exercised only with fixtures.
+- Viewer builds run synchronously; the MCP `ato_build` result carries the
+  structured output. Streaming through the terminal manager is not planned
+  unless builds routinely exceed a minute.
+- A viewer-session token (read scope) can start a build; the token is bound to
+  one directory and a build only regenerates that project's outputs.
+- No new config file: `.k3eda.json` keeps viewer assignments, atopile defaults
+  come from `ato.yaml`, an explicit assignment wins.
+- The last-build record stays in memory; persisting it would write into the
+  user's project or the T3 data directory for little gain.
+- Both skill sets are advertised to every provider: KiStack for KiCad-native
+  work, atopile for `.ato` projects. Their descriptions make the split clear
+  and agents pick by task.
+- atopile tools are granted to every MCP session. Add an `"atopile"` capability
+  (`McpInvocationContext.ts`, `McpSessionRegistry.ts`) only if per-thread
+  control is ever wanted.
 
-### Phase 3 follow-ups
+Still open:
 
-- The last-build record is in memory only; a server restart loses it until the
-  next build. Persisting it would mean writing into the user's project or the
-  T3 data directory; neither felt justified yet.
 - `meetsSpec` is `null` for every row in the March source's variables report,
-  so the out-of-spec highlight is wired but untested against real data.
-- The Design tab reads whole reports on every manifest revision change; fine for
-  boards with hundreds of parts, worth paging past a few thousand.
-- Problems still come only from build output. atopile has no separate `ato
-check`; the March `ato validate` crashes. If a working validate appears,
-  surface it here as pre-build diagnostics.
-
-### Phase 5 — remaining slices
-
-- **Slice 2, configurable command.** A server setting for the `ato` command
-  line (and `FBRK_LOG_DIR`) edited from Settings → atopile, consulted before
-  `T3CAD_ATO_COMMAND`. Removes the environment-variable-only configuration
-  listed under smaller items.
-- **Slice 3, install helper.** An Install button mirroring the VS Code
-  extension: download `uv` from astral-sh/uv releases into the T3 data dir when
-  missing, then `uv tool install --python 3.14 atopile==<pinned>`; progress via
-  a `ProviderInstallState`-style subscription. Note the extension itself only
-  ever runs `uv tool run` and pins the atopile version to its own extension
-  version, not to `requires-atopile`; T3CAD should honour `requires-atopile`
-  from the open project when it is a plain version.
-- **Skills follow-ups.** The `ato-language` skill carries atopile's rule text
-  verbatim plus a short corrections section (`lcsc_id`, `ato add`). The
-  community skill set used in the phase0 sample (mawildoer/atopile-agent-skill)
-  references an `ato mcp` LSP server that does not exist in the March source;
-  not bundled. Bundled skills do not appear in the `$` picker, which only lists
-  provider-discovered skills. Regenerate the bundle after editing
-  `apps/server/src/provider/atopile-skills/`.
-- **Highlighting follow-ups.** Uppercase `.ATO` stays plain text, consistent
-  with every other extension in `@pierre/diffs`. Mobile (`apps/mobile`) drives
-  shiki itself and does not register the grammar yet.
+  so the Design tab's out-of-spec highlight is untested against real data.
+- The Design tab reads whole reports on every manifest revision; page past a
+  few thousand parts if it ever matters.
+- `ato validate` crashes in the March source (`ImportError: front_end`), so
+  problems come only from build output. Surface pre-build diagnostics if a
+  working validate appears.
+- The installer pins `ATOPILE_PINNED_VERSION`; honour `requires-atopile` from
+  the open project when it is a plain version.
+- Uppercase `.ATO` stays plain text, consistent with every other extension in
+  `@pierre/diffs`.
 - The atopile VS Code extension directory ships an Apache-2.0 LICENSE while its
   `package.json` and the repo root say MIT; both notices are cited next to the
   copied grammar and rule text.
-
-### Smaller T3CAD items
-
-- Raw `HttpRouter` handlers resolve services from the served router's runtime,
-  not from `Layer.provide` on the routes layer (that only satisfies the types).
-  The build route shipped with exactly that bug and answered 500 until the
-  toolchain moved into `ReactorLayerLive`. A route-level test that serves
-  `kicadBuildRouteLayer` through `HttpRouter.serve` with a stub toolchain would
-  catch a regression; none exists yet.
-- Server restarts drop viewer-session tokens (in-memory), so an open KiCad
-  panel shows "Viewer access expired" until reopened. Persisting sessions or
-  auto re-minting from the host panel on 401 would smooth dev iterations.
-
-- `T3CAD_ATO_COMMAND` is an environment variable; Settings → atopile only
-  reads it today. Phase 5 slice 2 adds the editable setting, including
-  `FBRK_LOG_DIR`, needed when mixing atopile versions on one machine.
-- `ato_validate` was dropped because `ato validate` crashes in the March source
-  (`ImportError: front_end`). Revisit if a version fixes it.
-- Capability gating: the atopile tools are granted to every MCP session. Add an
-  `"atopile"` capability if per-thread control is wanted
-  (`McpInvocationContext.ts`, `McpSessionRegistry.ts`).
-- Windows: no 0.15.x wheel exists, and the toolchain probe assumes POSIX
-  shells in tests. Document as unsupported until a wheel appears.
-- Bundled electronics skills (upstream's KiStack set) and the atopile skills
-  overlap; decide which the agent sees by default.
+- The community skill set used briefly in the phase0 sample
+  (mawildoer/atopile-agent-skill) references an `ato mcp` LSP server that does
+  not exist in the March source; not bundled.
 
 ## Open: parts-server
 
-- `attributes` on explicit lookups (`/v0/component/lcsc/{id}`) so pinned parts
-  carry resistance/capacitance/etc. into atopile's solver, not just parametric picks.
-- More part families using atopile's 2024 `mappings.py` as the guide: LEDs
-  (colour, forward voltage, current), diodes, TVS, MOSFETs. Requires the
-  matching `is_pickable_by_type` endpoints on the atopile side, which today
-  only exist for resistors, capacitors, inductors.
-- Hot-value latency: common values (1kΩ 0402) take ~0.3 s due to ordering
-  across thousands of matches. A covering index on
-  `(endpoint, package, resistance_min, basic, preferred, stock)` or a
-  pre-ranked column would bring it to ~20 ms.
+- More families beyond R/C/L/LED/diode: TVS, MOSFETs, BJTs, fuses. Each needs
+  the matching `is_pickable_by_type` trait on the atopile side (the LED/diode
+  branch is the template) and a parser for the catalogue attributes.
 - Temperature coefficient coverage is ~45% of MLCCs; codes outside atopile's
   enum (`U2J`, `X8G`, `X6S`, `X7T`, `X8L`) are dropped. Widening requires an
   atopile enum change.
-- Datasheet URLs from JLCPCB are redirects that atopile rejects as "not a
-  PDF", producing two noisy errors per build. Options: resolve redirects at
-  index time, or serve the LCSC datasheet URL when available.
-- Catalogue refresh: `fetch-catalog` is manual (650 MB download, ~2 min index).
-  A `--if-older-than` guard or scheduled refresh would help.
+- Catalogue refresh is still manual; a scheduled refresh would need to own the
+  index rebuild too.
 - jlcparts is a scrape of JLCPCB's catalogue; review terms before offering the
   server publicly. Repo is private for now.
 - Multiple backends: the `Catalog` protocol exists but only jlcparts
@@ -176,22 +141,27 @@ check`; the March `ato validate` crashes. If a working validate appears,
 
 ## Open: atopile checkout
 
-- Upstream the EasyEDA header fix, or re-pin `atopile-easyeda2kicad` to a
-  version carrying upstream easyeda2kicad's fix. The public repo has had no
-  commits since March 2026, so a PR may sit.
-- Version pin decision stands: March source (`0.14.1004+76`) for a login-free
-  toolchain, 0.15.8 wheel if an atopile account is acceptable. Both read
+- Upstream the EasyEDA header fix (`fix/easyeda-user-agent`), or re-pin
+  `atopile-easyeda2kicad` to a version carrying upstream easyeda2kicad's fix.
+  The public repo has had no commits since March 2026, so a PR may sit. Opening
+  it is the maintainer's call.
+- `feat/led-diode-picking` (on top of the EasyEDA fix) is what phase0 builds
+  with; it moves the invalid-package error from compile time to pick time and
+  adds `has_package_requirements.package_name`. Upstreaming it needs the live
+  picker tests run against a components service.
+- Version pin decision stands: March source for a login-free toolchain, 0.15.8
+  wheel if an atopile account is acceptable. Both read
   `services.components.url`; 0.15.8 also demands a stored token before any
   request, so parts-server alone does not unblock it.
-- `FBRK_LOG_DIR` must be isolated when 0.14 and 0.15 share a machine; their
-  SQLite log schemas differ (`build_history has no column display_name`).
-- The March-source `.venv` is built with `CC=/usr/bin/gcc CXX=/usr/bin/g++ uv sync`
-  because linuxbrew's CMake does not find a C++ compiler on its own. Document
-  in a setup script if more machines need it.
+- `FBRK_LOG_DIR` must be isolated when 0.14 and 0.15 share a machine (their
+  SQLite log schemas differ); the Settings entry exists for this.
 
 ## Open: phase0 sample
 
-- The LED stays pinned (`lcsc_id`) until LEDs are parametric.
-- The two datasheet errors per build are noise (see parts-server item);
-  `exclude_targets` cannot remove `datasheets` because the default target
-  group always includes it.
+- Every part is now picked from constraints (2026-09-08): the LED by
+  `color = "RED"`, `package = "0603"`, `max_brightness >= 100mcd` and
+  `diode.forward_voltage within 1.6V to 2.4V`, which selects the part that
+  used to be pinned. Requires the atopile checkout on `feat/led-diode-picking`
+  and a parts-server index at schema 3 (`parts-server build-index`).
+- The datasheet errors are gone with parts-server's URL rewrite; the
+  `datasheets` stage now passes.
